@@ -1,0 +1,195 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type DriverTripStatus =
+  | "scheduled"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+export type DriverTripDirection =
+  | "home_to_school"
+  | "school_to_home";
+
+export type DriverTrip = {
+  id: string;
+  driverId: string | null;
+  direction: DriverTripDirection | null;
+  scheduledStart: string | null;
+  actualStart: string | null;
+  actualEnd: string | null;
+  status: DriverTripStatus;
+};
+
+type TripRow = {
+  id: string;
+  driver_id: string | null;
+  direction: DriverTripDirection | null;
+  scheduled_start: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+  status: DriverTripStatus;
+};
+
+const TRIP_SELECT = `
+  id,
+  driver_id,
+  direction,
+  scheduled_start,
+  actual_start,
+  actual_end,
+  status
+`;
+
+export class TripRepository {
+  constructor(
+    private readonly supabase: SupabaseClient,
+  ) {}
+
+  async markCompleted(
+    tripId: string,
+  ): Promise<void> {
+    const { error } = await this.supabase
+      .from("trips")
+      .update({
+        status: "completed",
+        actual_end: new Date().toISOString(),
+      })
+      .eq("id", tripId)
+      .eq("status", "in_progress");
+
+    if (error) {
+      throw new Error(
+        `Failed to complete trip: ${error.message}`,
+      );
+    }
+  }
+
+  async markInProgress(
+    tripId: string,
+  ): Promise<void> {
+    const { error } = await this.supabase
+      .from("trips")
+      .update({
+        status: "in_progress",
+        actual_start: new Date().toISOString(),
+        actual_end: null,
+      })
+      .eq("id", tripId)
+      .eq("status", "scheduled");
+
+    if (error) {
+      throw new Error(
+        `Failed to start trip: ${error.message}`,
+      );
+    }
+  }
+
+  async findActiveTripForDriver(
+    driverId: string,
+  ): Promise<DriverTrip | null> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .select(TRIP_SELECT)
+      .eq("driver_id", driverId)
+      .eq("status", "in_progress")
+      .order("actual_start", {
+        ascending: false,
+        nullsFirst: false,
+      })
+      .limit(1)
+      .maybeSingle<TripRow>();
+
+    if (error) {
+      throw new Error(
+        `Failed to find active driver trip: ${error.message}`,
+      );
+    }
+
+    return data
+      ? this.toDomain(data)
+      : null;
+  }
+
+  async findNextScheduledTripForDriver(
+    driverId: string,
+  ): Promise<DriverTrip | null> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .select(TRIP_SELECT)
+      .eq("driver_id", driverId)
+      .eq("status", "scheduled")
+      .not("scheduled_start", "is", null)
+      .order("scheduled_start", {
+        ascending: true,
+        nullsFirst: false,
+      })
+      .limit(1)
+      .maybeSingle<TripRow>();
+
+    if (error) {
+      throw new Error(
+        `Failed to find next scheduled driver trip: ${error.message}`,
+      );
+    }
+
+    return data
+      ? this.toDomain(data)
+      : null;
+  }
+
+  async findRecentlyCompletedTripForDriver(
+    driverId: string,
+  ): Promise<DriverTrip | null> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .select(TRIP_SELECT)
+      .eq("driver_id", driverId)
+      .eq("status", "completed")
+      .not("actual_end", "is", null)
+      .order("actual_end", {
+        ascending: false,
+        nullsFirst: false,
+      })
+      .limit(1)
+      .maybeSingle<TripRow>();
+
+    if (error) {
+      throw new Error(
+        `Failed to find recently completed driver trip: ${error.message}`,
+      );
+    }
+
+    return data
+      ? this.toDomain(data)
+      : null;
+  }
+
+  async findCurrentTripForDriver(
+    driverId: string,
+  ): Promise<DriverTrip | null> {
+    const activeTrip =
+      await this.findActiveTripForDriver(driverId);
+
+    if (activeTrip) {
+      return activeTrip;
+    }
+
+    return this.findNextScheduledTripForDriver(
+      driverId,
+    );
+  }
+
+  private toDomain(
+    row: TripRow,
+  ): DriverTrip {
+    return {
+      id: row.id,
+      driverId: row.driver_id,
+      direction: row.direction,
+      scheduledStart: row.scheduled_start,
+      actualStart: row.actual_start,
+      actualEnd: row.actual_end,
+      status: row.status,
+    };
+  }
+}
