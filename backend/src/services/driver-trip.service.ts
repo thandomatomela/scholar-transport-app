@@ -1,12 +1,14 @@
-import { TripStopRepository } from "../repositories/trip-stop.repository.js";
+import { publishDomainEvent } from "../events/event-bus.js";
+
+import {
+  TripStopRepository,
+  type DriverTripStop,
+} from "../repositories/trip-stop.repository.js";
+
 import {
   TripRepository,
   type DriverTrip,
 } from "../repositories/trip.repository.js";
-
-type DriverTripStop = Awaited<
-  ReturnType<TripStopRepository["findByTripId"]>
->[number];
 
 export type DriverTripPhase =
   | "pickup"
@@ -45,6 +47,49 @@ export class DriverTripService {
     private readonly tripStopRepository: TripStopRepository,
     private readonly tripRepository: TripRepository,
   ) {}
+
+  async startMorningRun(
+  driverId: string,
+): Promise<void> {
+  await this.startRun(
+    driverId,
+    "home_to_school",
+  );
+}
+
+async startAfternoonRun(
+  driverId: string,
+): Promise<void> {
+  await this.startRun(
+    driverId,
+    "school_to_home",
+  );
+}
+
+  private async startRun(
+  driverId: string,
+  direction: "home_to_school" | "school_to_home",
+): Promise<void> {
+  const trip =
+    await this.tripRepository.findReusableTripForDriver(
+      driverId,
+      direction,
+    );
+
+  if (!trip) {
+    throw new Error(
+      `No ${direction} trip is available for this driver.`,
+    );
+  }
+
+  await this.tripStopRepository.resetTripStops(
+    trip.id,
+  );
+
+  await this.tripRepository.restartForDevelopment(
+    trip.id,
+  );
+}
 
   async getDriverDashboard(
     driverId: string,
@@ -119,16 +164,109 @@ export class DriverTripService {
     );
   }
 
-  async pickUpLearner(
+  async notifyParentDriverArrived(
     tripId: string,
     stopId: string,
-  ): Promise<DriverTripStop> {
-    return this.tripStopRepository.markPickedUp(
+  ): Promise<void> {
+    const stops =
+      await this.tripStopRepository.findByTripId(
+        tripId,
+      );
+
+    const stop = stops.find(
+      (candidate) =>
+        candidate.id === stopId,
+    );
+
+    if (!stop) {
+      throw new Error(
+        "Trip stop was not found.",
+      );
+    }
+
+    await publishDomainEvent({
+      type: "driver.arrived",
+      tripId,
+      stopId,
+      learnerId: stop.learnerId,
+      occurredAt:
+        new Date().toISOString(),
+    });
+  }
+
+  async pickUpLearner(
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  console.log("Starting learner pickup:", {
+    tripId,
+    stopId,
+  });
+
+  const updatedStop =
+    await this.tripStopRepository.markPickedUp(
       tripId,
       stopId,
     );
+
+  console.log("Learner marked as picked up:", {
+    stopId: updatedStop.id,
+    learnerId: updatedStop.learnerId,
+    learnerName: updatedStop.learner.fullName,
+  });
+
+  const manifest =
+    await this.getTripManifest(tripId);
+
+  console.log("Manifest after pickup:", {
+    currentPhase: manifest.currentPhase,
+    nextAction: manifest.nextAction,
+    nextStopId: manifest.nextStop?.id ?? null,
+    nextLearnerId:
+      manifest.nextStop?.learnerId ?? null,
+    nextLearnerName:
+      manifest.nextStop?.learner.fullName ?? null,
+  });
+
+  const nextStop =
+    manifest.currentPhase === "pickup"
+      ? manifest.nextStop
+      : null;
+
+  if (!nextStop) {
+    console.log(
+      "No next pickup stop found. On-the-way notification not published.",
+    );
+
+    return updatedStop;
   }
 
+  console.log(
+    "Publishing driver.on_the_way:",
+    {
+      tripId,
+      stopId: nextStop.id,
+      learnerId: nextStop.learnerId,
+      learnerName:
+        nextStop.learner.fullName,
+    },
+  );
+
+  await publishDomainEvent({
+  type: "driver.on_the_way",
+  tripId,
+  stopId: nextStop.id,
+  learnerId: nextStop.learnerId,
+  address: nextStop.address,
+  occurredAt: new Date().toISOString(),
+});
+
+  console.log(
+    "driver.on_the_way event published.",
+  );
+
+  return updatedStop;
+}
   async markLearnerAbsent(
     tripId: string,
     stopId: string,
@@ -219,12 +357,14 @@ export class DriverTripService {
       currentPhase,
       nextAction,
       nextStop,
-      learnerCount: orderedStops.length,
+      learnerCount:
+        orderedStops.length,
       completedCount,
       remainingCount:
         orderedStops.length -
         completedCount,
-      learners: orderedStops,
+      learners:
+        orderedStops,
     };
   }
 }

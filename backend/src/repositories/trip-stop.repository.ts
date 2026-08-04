@@ -45,6 +45,30 @@ type TripStopRow = {
 };
 
 export class TripStopRepository {
+
+  async resetTripStops(
+  tripId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("trip_stops")
+    .update({
+      status: "pending",
+      picked_up_at: null,
+      dropped_off_at: null,
+      marked_absent_at: null,
+      updated_at: now,
+    })
+    .eq("trip_id", tripId);
+
+  if (error) {
+    throw new Error(
+      `Failed to reset trip stops: ${error.message}`,
+    );
+  }
+}
+
   async findByTripId(
   tripId: string,
 ): Promise<DriverTripStop[]> {

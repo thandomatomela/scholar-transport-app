@@ -1,5 +1,12 @@
 import { supabase } from "../config/supabase.js";
-import type { TripEventType } from "./trip.service.js";
+import type {
+  TripEventType,
+} from "./trip.service.js";
+
+export type NotificationEventType =
+  | TripEventType
+  | "driver_arrived"
+  | "driver_on_the_way";
 
 type NotificationPreferenceColumn =
   | "receive_pickup_notifications"
@@ -15,14 +22,16 @@ export type NotificationRecipient = {
 };
 
 function getPreferenceColumn(
-  eventType: TripEventType,
+  eventType: NotificationEventType,
 ): NotificationPreferenceColumn | null {
   switch (eventType) {
     case "picked_up":
       return "receive_pickup_notifications";
 
     case "next_for_dropoff":
-      return "receive_tracking_link";
+case "driver_arrived":
+case "driver_on_the_way":
+  return "receive_tracking_link";
 
     case "dropped_off":
       return "receive_dropoff_notifications";
@@ -34,9 +43,10 @@ function getPreferenceColumn(
 
 export async function getNotificationRecipients(
   learnerId: string,
-  eventType: TripEventType,
+  eventType: NotificationEventType,
 ): Promise<NotificationRecipient[]> {
-  const preferenceColumn = getPreferenceColumn(eventType);
+  const preferenceColumn =
+    getPreferenceColumn(eventType);
 
   if (!preferenceColumn) {
     return [];
@@ -59,7 +69,9 @@ export async function getNotificationRecipients(
     `)
     .eq("learner_id", learnerId)
     .eq(preferenceColumn, true)
-    .order("notification_priority", { ascending: true });
+    .order("notification_priority", {
+      ascending: true,
+    });
 
   if (error) {
     throw new Error(
@@ -74,7 +86,11 @@ export async function getNotificationRecipients(
       ? row.contact[0]
       : row.contact;
 
-    if (!contact || !contact.whatsapp_enabled) {
+    if (
+      !contact ||
+      !contact.whatsapp_enabled ||
+      !contact.phone_number
+    ) {
       continue;
     }
 
@@ -82,8 +98,13 @@ export async function getNotificationRecipients(
       contactId: contact.id,
       fullName: contact.full_name,
       phoneNumber: contact.phone_number,
-      relationship: contact.relationship,
-      priority: row.notification_priority,
+      relationship:
+        contact.relationship ?? null,
+      priority:
+        typeof row.notification_priority ===
+        "number"
+          ? row.notification_priority
+          : 0,
     });
   }
 

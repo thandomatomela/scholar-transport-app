@@ -3,36 +3,70 @@ import type {
   DomainEventHandler,
 } from "./domain-event.js";
 
+type DomainEventType =
+  DomainEvent["type"];
+
+type EventForType<
+  TEventType extends DomainEventType,
+> = Extract<
+  DomainEvent,
+  {
+    type: TEventType;
+  }
+>;
+
 const handlers = new Map<
-  DomainEvent["type"],
+  DomainEventType,
   DomainEventHandler[]
 >();
 
-export function subscribeToDomainEvent(
-  eventType: DomainEvent["type"],
-  handler: DomainEventHandler,
-) {
-  const existingHandlers = handlers.get(eventType) ?? [];
+export function subscribeToDomainEvent<
+  TEventType extends DomainEventType,
+>(
+  eventType: TEventType,
+  handler: DomainEventHandler<
+    EventForType<TEventType>
+  >,
+): void {
+  const existingHandlers =
+    handlers.get(eventType) ?? [];
 
-  existingHandlers.push(handler);
-  handlers.set(eventType, existingHandlers);
+  existingHandlers.push(
+    handler as DomainEventHandler,
+  );
+
+  handlers.set(
+    eventType,
+    existingHandlers,
+  );
 }
 
 export async function publishDomainEvent(
   event: DomainEvent,
-) {
-  const eventHandlers = handlers.get(event.type) ?? [];
+): Promise<void> {
+  const eventHandlers =
+    handlers.get(event.type) ?? [];
 
-  const results = await Promise.allSettled(
-    eventHandlers.map((handler) => handler(event)),
-  );
+  const results =
+    await Promise.allSettled(
+      eventHandlers.map(
+        async (handler) => {
+          await handler(event);
+        },
+      ),
+    );
 
   for (const result of results) {
-    if (result.status === "rejected") {
-      console.error("Domain event handler failed:", {
-        event,
-        error: result.reason,
-      });
+    if (
+      result.status === "rejected"
+    ) {
+      console.error(
+        "Domain event handler failed:",
+        {
+          event,
+          error: result.reason,
+        },
+      );
     }
   }
 }

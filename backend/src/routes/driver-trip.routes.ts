@@ -6,8 +6,11 @@ import {
   getDriverDashboard,
   getDriverTripManifest,
   markLearnerAbsent,
+  notifyParentDriverArrived,
   pickUpLearner,
+  startAfternoonRun,
   startDriverTrip,
+  startMorningRun,
 } from "../controllers/driver-trip.controller.js";
 
 export const driverTripRouter = Router();
@@ -15,6 +18,21 @@ export const driverTripRouter = Router();
 driverTripRouter.get(
   "/me/dashboard",
   getDriverDashboard,
+);
+
+driverTripRouter.post(
+  "/me/start-morning-run",
+  startMorningRun,
+);
+
+driverTripRouter.post(
+  "/me/start-afternoon-run",
+  startAfternoonRun,
+);
+
+driverTripRouter.post(
+  "/trips/:tripId/stops/:stopId/notify-parent",
+  notifyParentDriverArrived,
 );
 
 driverTripRouter.get(

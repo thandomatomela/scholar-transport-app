@@ -40,6 +40,78 @@ function getErrorMessage(
     : "An unexpected error occurred.";
 }
 
+function getConflictStatusCode(
+  message: string,
+): number {
+  if (
+    message.includes("not found") ||
+    message.includes("no longer") ||
+    message.includes("not currently")
+  ) {
+    return 409;
+  }
+
+  return 500;
+}
+
+export async function startMorningRun(
+  _request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    await driverTripService.startMorningRun(
+      TEST_DRIVER_ID,
+    );
+
+    const dashboard =
+      await driverTripService.getDriverDashboard(
+        TEST_DRIVER_ID,
+      );
+
+    response.status(200).json({
+      data: dashboard,
+    });
+  } catch (error) {
+    const message =
+      getErrorMessage(error);
+
+    response.status(
+      getConflictStatusCode(message),
+    ).json({
+      error: message,
+    });
+  }
+}
+
+export async function startAfternoonRun(
+  _request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    await driverTripService.startAfternoonRun(
+      TEST_DRIVER_ID,
+    );
+
+    const dashboard =
+      await driverTripService.getDriverDashboard(
+        TEST_DRIVER_ID,
+      );
+
+    response.status(200).json({
+      data: dashboard,
+    });
+  } catch (error) {
+    const message =
+      getErrorMessage(error);
+
+    response.status(
+      getConflictStatusCode(message),
+    ).json({
+      error: message,
+    });
+  }
+}
+
 export async function getDriverDashboard(
   _request: Request,
   response: Response,
@@ -57,12 +129,6 @@ export async function getDriverDashboard(
         TEST_DRIVER_ID,
       );
 
-    /*
-     * This endpoint always returns 200.
-     *
-     * It is valid for activeTrip, nextTrip, or
-     * recentlyCompletedTrip to be null.
-     */
     response.status(200).json({
       data: dashboard,
     });
@@ -112,7 +178,8 @@ export async function getDriverTripManifest(
 
     if (!tripId) {
       response.status(400).json({
-        error: "Trip ID is required.",
+        error:
+          "Trip ID is required.",
       });
 
       return;
@@ -143,7 +210,8 @@ export async function startDriverTrip(
 
     if (!tripId) {
       response.status(400).json({
-        error: "Trip ID is required.",
+        error:
+          "Trip ID is required.",
       });
 
       return;
@@ -163,7 +231,9 @@ export async function startDriverTrip(
     const message =
       getErrorMessage(error);
 
-    response.status(500).json({
+    response.status(
+      getConflictStatusCode(message),
+    ).json({
       error: message,
     });
   }
@@ -261,6 +331,60 @@ export async function markLearnerAbsent(
         "not found or is no longer pending",
       )
         ? 409
+        : 500;
+
+    response.status(statusCode).json({
+      error: message,
+    });
+  }
+}
+
+export async function notifyParentDriverArrived(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const tripId =
+      getRouteParameter(
+        request.params.tripId,
+      );
+
+    const stopId =
+      getRouteParameter(
+        request.params.stopId,
+      );
+
+    if (!tripId || !stopId) {
+      response.status(400).json({
+        error:
+          "Trip ID and stop ID are required.",
+      });
+
+      return;
+    }
+
+    await driverTripService.notifyParentDriverArrived(
+      tripId,
+      stopId,
+    );
+
+    response.status(200).json({
+      data: {
+        tripId,
+        stopId,
+        notification:
+          "Parent arrival notification requested.",
+      },
+    });
+  } catch (error) {
+    const message =
+      getErrorMessage(error);
+
+    const statusCode =
+      message.includes(
+        "Trip stop was not found",
+      )
+        ? 404
         : 500;
 
     response.status(statusCode).json({

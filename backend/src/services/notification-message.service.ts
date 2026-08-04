@@ -1,15 +1,21 @@
-import type { PreparedNotification } from "./notification-orchestrator.service.js";
+import type {
+  PreparedNotification,
+} from "./notification-orchestrator.service.js";
 
 export type NotificationMessage = {
   title: string;
   body: string;
-  eventType: PreparedNotification["eventType"];
+  eventType:
+    PreparedNotification["eventType"];
   learnerNames: string[];
   trackingLink: string | null;
 };
 
-function getFirstName(fullName: string): string {
-  const trimmedName = fullName.trim();
+function getFirstName(
+  fullName: string,
+): string {
+  const trimmedName =
+    fullName.trim();
 
   if (!trimmedName) {
     return "there";
@@ -18,7 +24,9 @@ function getFirstName(fullName: string): string {
   return trimmedName.split(/\s+/)[0];
 }
 
-function formatLearnerNames(learnerNames: string[]): string {
+function formatLearnerNames(
+  learnerNames: string[],
+): string {
   if (learnerNames.length === 0) {
     return "your child";
   }
@@ -28,25 +36,88 @@ function formatLearnerNames(learnerNames: string[]): string {
   }
 
   if (learnerNames.length === 2) {
-    return `${learnerNames[0]} and ${learnerNames[1]}`;
+    return (
+      `${learnerNames[0]} and ` +
+      learnerNames[1]
+    );
   }
 
-  const allButLast = learnerNames.slice(0, -1).join(", ");
-  const lastLearner = learnerNames[learnerNames.length - 1];
+  const allButLast =
+    learnerNames
+      .slice(0, -1)
+      .join(", ");
 
-  return `${allButLast}, and ${lastLearner}`;
+  const lastLearner =
+    learnerNames[
+      learnerNames.length - 1
+    ];
+
+  return (
+    `${allButLast}, and ` +
+    lastLearner
+  );
 }
 
 export function buildNotificationMessage(
-  notification: PreparedNotification,
+  notification:
+    PreparedNotification,
 ): NotificationMessage {
-  const recipientFirstName = getFirstName(notification.recipientName);
-  const learnerNames = formatLearnerNames(notification.learnerNames);
-  const plural = notification.learnerNames.length > 1;
+  const recipientFirstName =
+    getFirstName(
+      notification.recipientName,
+    );
+
+  const learnerNames =
+    formatLearnerNames(
+      notification.learnerNames,
+    );
+
+  const plural =
+    notification.learnerNames.length >
+    1;
 
   let body: string;
 
-  switch (notification.eventType) {
+  switch (
+    notification.eventType
+  ) {
+
+    case "driver_on_the_way": {
+  const pickupAddress =
+    notification.pickupAddress?.trim() ||
+    "the agreed pickup address";
+
+  const learnerFirstName =
+    notification.learnerNames[0]
+      ?.trim()
+      .split(/\s+/)[0] ||
+    "the learner";
+
+  body = [
+    `Hi ${recipientFirstName},`,
+    "",
+    `The driver is now on the way to ${pickupAddress} to pick up ${learnerNames}.`,
+    "",
+    `Please make sure ${learnerFirstName} is ready.`,
+  ].join("\n");
+
+  break;
+}
+  
+    case "driver_arrived":
+      body = [
+        `Hi ${recipientFirstName},`,
+        "",
+        `The driver has arrived for ${learnerNames}.`,
+        "",
+        `Please meet the driver at the agreed ${
+          plural
+            ? "collection or drop-off points"
+            : "collection or drop-off point"
+        }.`,
+      ].join("\n");
+      break;
+
     case "picked_up":
       body = [
         `Hi ${recipientFirstName},`,
@@ -70,7 +141,9 @@ export function buildNotificationMessage(
         } next for drop-off.`,
         "",
         `Please be ready to receive ${
-          plural ? "them" : "your child"
+          plural
+            ? "them"
+            : "your child"
         }.`,
       ].join("\n");
       break;
@@ -104,10 +177,17 @@ export function buildNotificationMessage(
   }
 
   return {
-    title: "Scholar Transport Update",
+    title:
+  notification.eventType === "driver_arrived"
+    ? "Driver Arrived"
+    : notification.eventType === "driver_on_the_way"
+      ? "Driver On The Way"
+      : "Scholar Transport Update",
     body,
-    eventType: notification.eventType,
-    learnerNames: notification.learnerNames,
+    eventType:
+      notification.eventType,
+    learnerNames:
+      notification.learnerNames,
     trackingLink: null,
   };
 }
