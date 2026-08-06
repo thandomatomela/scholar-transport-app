@@ -43,15 +43,30 @@ export class WhatsAppNotificationProvider
           Authorization: `Bearer ${this.config.accessToken}`,
           "Content-Type": "application/json",
         },
+        // body: JSON.stringify({
+        //   messaging_product: "whatsapp",
+        //   recipient_type: "individual",
+        //   to: normalizePhoneNumber(request.phoneNumber),
+        //   type: "text",
+        //   text: {
+        //     preview_url: false,
+        //     body: request.message.body,
+        //   },
+        //test code start//
         body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: normalizePhoneNumber(request.phoneNumber),
-          type: "text",
-          text: {
-            preview_url: false,
-            body: request.message.body,
-          },
+  messaging_product: "whatsapp",
+  recipient_type: "individual",
+  to: normalizePhoneNumber(request.phoneNumber),
+  type: "template",
+  template: {
+    name: "hello_world",
+    language: {
+      code: "en_US",
+    },
+  },
+
+
+        //test code end//
         }),
         signal: controller.signal,
       });
