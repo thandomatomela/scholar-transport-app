@@ -2,6 +2,12 @@ import type {
   PreparedNotification,
 } from "./notification-orchestrator.service.js";
 
+export type WhatsAppTemplateMessage = {
+  name: string;
+  languageCode: string;
+  parameters: string[];
+};
+
 export type NotificationMessage = {
   title: string;
   body: string;
@@ -9,7 +15,11 @@ export type NotificationMessage = {
     PreparedNotification["eventType"];
   learnerNames: string[];
   trackingLink: string | null;
+  whatsappTemplate:
+    WhatsAppTemplateMessage | null;
 };
+
+const TEMPORARY_ETA_MINUTES = "5";
 
 function getFirstName(
   fullName: string,
@@ -21,7 +31,10 @@ function getFirstName(
     return "there";
   }
 
-  return trimmedName.split(/\s+/)[0];
+  return (
+    trimmedName.split(/\s+/)[0] ??
+    "there"
+  );
 }
 
 function formatLearnerNames(
@@ -76,35 +89,85 @@ export function buildNotificationMessage(
     notification.learnerNames.length >
     1;
 
+  let title =
+    "Scholar Transport Update";
+
   let body: string;
+
+  let whatsappTemplate:
+    WhatsAppTemplateMessage | null =
+    null;
 
   switch (
     notification.eventType
   ) {
-
     case "driver_on_the_way": {
-  const pickupAddress =
-    notification.pickupAddress?.trim() ||
-    "the agreed pickup address";
+      const pickupAddress =
+        notification.pickupAddress
+          ?.trim() ||
+        "the agreed pickup address";
 
-  const learnerFirstName =
-    notification.learnerNames[0]
-      ?.trim()
-      .split(/\s+/)[0] ||
-    "the learner";
+      const learnerFirstName =
+        notification.learnerNames[0]
+          ?.trim()
+          .split(/\s+/)[0] ||
+        "the learner";
 
-  body = [
-    `Hi ${recipientFirstName},`,
-    "",
-    `The driver is now on the way to ${pickupAddress} to pick up ${learnerNames}.`,
-    "",
-    `Please make sure ${learnerFirstName} is ready.`,
-  ].join("\n");
+      title =
+        "Driver On The Way";
 
-  break;
-}
-  
+      body = [
+        `Good day ${recipientFirstName},`,
+        "",
+        `Your driver is on the way to collect ${learnerNames}.`,
+        "",
+        "Pickup address:",
+        pickupAddress,
+        "",
+        `Estimated arrival: approximately ${TEMPORARY_ETA_MINUTES} minutes.`,
+        "",
+        `Please ensure ${learnerFirstName} is ready outside.`,
+        "",
+        "Thank you,",
+        "Via Nova Scholar Transport",
+      ].join("\n");
+
+      whatsappTemplate = {
+        name:
+          "driver_on_the_way",
+
+        /*
+         * This must exactly match the language
+         * shown for the approved Meta template.
+         *
+         * Your template was created as English,
+         * which normally uses "en".
+         */
+        languageCode: "en",
+
+        /*
+         * Variable order must match Meta:
+         *
+         * {{1}} Parent name
+         * {{2}} Learner name
+         * {{3}} Pickup address
+         * {{4}} ETA minutes
+         */
+        parameters: [
+          recipientFirstName,
+          learnerNames,
+          pickupAddress,
+          TEMPORARY_ETA_MINUTES,
+        ],
+      };
+
+      break;
+    }
+
     case "driver_arrived":
+      title =
+        "Driver Arrived";
+
       body = [
         `Hi ${recipientFirstName},`,
         "",
@@ -116,6 +179,7 @@ export function buildNotificationMessage(
             : "collection or drop-off point"
         }.`,
       ].join("\n");
+
       break;
 
     case "picked_up":
@@ -130,6 +194,7 @@ export function buildNotificationMessage(
         "",
         "Thank you for choosing our scholar transport service.",
       ].join("\n");
+
       break;
 
     case "next_for_dropoff":
@@ -146,6 +211,7 @@ export function buildNotificationMessage(
             : "your child"
         }.`,
       ].join("\n");
+
       break;
 
     case "dropped_off":
@@ -158,6 +224,7 @@ export function buildNotificationMessage(
         "",
         "Thank you for choosing our scholar transport service.",
       ].join("\n");
+
       break;
 
     case "trip_created":
@@ -166,6 +233,7 @@ export function buildNotificationMessage(
         "",
         `A new transport trip has been scheduled for ${learnerNames}.`,
       ].join("\n");
+
       break;
 
     default:
@@ -177,17 +245,13 @@ export function buildNotificationMessage(
   }
 
   return {
-    title:
-  notification.eventType === "driver_arrived"
-    ? "Driver Arrived"
-    : notification.eventType === "driver_on_the_way"
-      ? "Driver On The Way"
-      : "Scholar Transport Update",
+    title,
     body,
     eventType:
       notification.eventType,
     learnerNames:
       notification.learnerNames,
     trackingLink: null,
+    whatsappTemplate,
   };
 }
