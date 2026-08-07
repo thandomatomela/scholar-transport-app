@@ -154,11 +154,11 @@ export function buildNotificationMessage(
          * {{4}} ETA minutes
          */
         parameters: [
-          recipientFirstName,
-          learnerNames,
-          pickupAddress,
-          TEMPORARY_ETA_MINUTES,
-        ],
+  recipientFirstName,        // {{1}}
+  pickupAddress,             // {{2}}
+  TEMPORARY_ETA_MINUTES,     // {{3}}
+  learnerNames,              // {{4}}
+],
       };
 
       break;
