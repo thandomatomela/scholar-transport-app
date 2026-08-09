@@ -26,6 +26,7 @@ export default function Page() {
     startAfternoonDriverRun,
     performTripStopAction,
     notifyParent,
+    undoLastAction,
   } = useDriverDashboard();
 
   const {
@@ -42,14 +43,20 @@ export default function Page() {
   const activeTrip =
     dashboard?.activeTrip ?? null;
 
+  const recentlyCompletedTrip =
+    dashboard?.recentlyCompletedTrip ??
+    null;
+
   const recentlyCompletedDirection =
-    dashboard?.recentlyCompletedTrip
-      ?.direction ?? null;
+    recentlyCompletedTrip?.direction ??
+    null;
 
   return (
     <main className="min-h-screen bg-slate-100 pb-24">
       <div className="mx-auto flex max-w-3xl flex-col gap-5 p-4">
-        <DashboardHeader driverName="Driver" />
+        <DashboardHeader
+          driverName="Driver"
+        />
 
         {error ? (
           <DashboardError
@@ -75,47 +82,69 @@ export default function Page() {
             recentlyCompletedDirection={
               recentlyCompletedDirection
             }
+            recentlyCompletedTripId={
+              recentlyCompletedTrip?.id ??
+              null
+            }
             onStartMorning={() => {
               void startMorningDriverRun();
             }}
             onStartAfternoon={() => {
               void startAfternoonDriverRun();
             }}
+            onUndoLastAction={() => {
+              void undoLastAction();
+            }}
           />
         ) : null}
 
         {activeTrip ? (
           <NextStopCard
-            manifest={activeTrip.manifest}
-            actionLoading={actionLoading}
+            manifest={
+              activeTrip.manifest
+            }
+            actionLoading={
+              actionLoading
+            }
             onStopAction={
               performTripStopAction
             }
-            onNotifyParent={notifyParent}
+            onNotifyParent={
+              notifyParent
+            }
+            onUndoLastAction={
+              undoLastAction
+            }
           />
         ) : null}
 
         <DashboardMap
           stops={
-            activeTrip?.manifest.learners ??
+            activeTrip
+              ?.manifest.learners ??
             []
           }
           nextStop={
-            activeTrip?.manifest.nextStop ??
+            activeTrip
+              ?.manifest.nextStop ??
             null
           }
         />
 
         <TodayTripsCard
-          activeTrip={activeTrip}
-          nextTrip={
-            dashboard?.nextTrip ?? null
+          activeTrip={
+            activeTrip
           }
-          recentlyCompletedTrip={
-            dashboard?.recentlyCompletedTrip ??
+          nextTrip={
+            dashboard?.nextTrip ??
             null
           }
-          actionLoading={actionLoading}
+          recentlyCompletedTrip={
+            recentlyCompletedTrip
+          }
+          actionLoading={
+            actionLoading
+          }
           onStartNextTrip={() => {
             void startNextTrip();
           }}
@@ -129,19 +158,33 @@ export default function Page() {
 
 type RunLauncherProps = {
   loading: boolean;
+
   recentlyCompletedDirection:
     | DriverTripDirection
     | null
     | undefined;
-  onStartMorning: () => void;
-  onStartAfternoon: () => void;
+
+  recentlyCompletedTripId:
+    | string
+    | null;
+
+  onStartMorning:
+    () => void;
+
+  onStartAfternoon:
+    () => void;
+
+  onUndoLastAction:
+    () => void;
 };
 
 function RunLauncher({
   loading,
   recentlyCompletedDirection,
+  recentlyCompletedTripId,
   onStartMorning,
   onStartAfternoon,
+  onUndoLastAction,
 }: RunLauncherProps) {
   const morningCompleted =
     recentlyCompletedDirection ===
@@ -152,78 +195,101 @@ function RunLauncher({
     "school_to_home";
 
   if (afternoonCompleted) {
-  return (
-    <section className="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-        Driver runs
-      </p>
+    return (
+      <section className="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+          Driver runs
+        </p>
 
-      <h2 className="mt-2 text-2xl font-bold text-slate-900">
-        Today&apos;s runs are complete
-      </h2>
+        <h2 className="mt-2 text-2xl font-bold text-slate-900">
+          Today&apos;s runs are complete
+        </h2>
 
-      <p className="mt-2 text-sm leading-6 text-slate-600">
-        Both runs have finished. You can restart either run while the app is using development test data.
-      </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Both runs have finished. You can
+          undo the final drop-off or restart
+          either run while the app is using
+          development test data.
+        </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <button
-          type="button"
-          disabled={loading}
-          onClick={onStartMorning}
-          className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <p className="text-3xl">
-            🌅
-          </p>
+        {recentlyCompletedTripId ? (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={
+              onUndoLastAction
+            }
+            className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ↶ Undo Last Drop-Off
+          </button>
+        ) : null}
 
-          <h3 className="mt-3 text-lg font-bold text-slate-900">
-            Restart Morning Run
-          </h3>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={
+              onStartMorning
+            }
+            className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <p className="text-3xl">
+              🌅
+            </p>
 
-          <p className="mt-1 text-sm font-semibold text-amber-800">
-            Home → School
-          </p>
+            <h3 className="mt-3 text-lg font-bold text-slate-900">
+              Restart Morning Run
+            </h3>
 
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Reset all morning stops and begin again.
-          </p>
-        </button>
+            <p className="mt-1 text-sm font-semibold text-amber-800">
+              Home → School
+            </p>
 
-        <button
-          type="button"
-          disabled={loading}
-          onClick={onStartAfternoon}
-          className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <p className="text-3xl">
-            🌇
-          </p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Reset all morning stops
+              and begin again.
+            </p>
+          </button>
 
-          <h3 className="mt-3 text-lg font-bold text-slate-900">
-            Restart Afternoon Run
-          </h3>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={
+              onStartAfternoon
+            }
+            className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <p className="text-3xl">
+              🌇
+            </p>
 
-          <p className="mt-1 text-sm font-semibold text-indigo-800">
-            School → Home
-          </p>
+            <h3 className="mt-3 text-lg font-bold text-slate-900">
+              Restart Afternoon Run
+            </h3>
 
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Reset all afternoon stops and begin again.
-          </p>
-        </button>
-      </div>
+            <p className="mt-1 text-sm font-semibold text-indigo-800">
+              School → Home
+            </p>
 
-      <p className="mt-4 text-center text-xs text-slate-400">
-        Development mode: restarting a run resets its trip stops.
-      </p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Reset all afternoon stops
+              and begin again.
+            </p>
+          </button>
+        </div>
 
-      {loading ? (
-        <RunPreparingState />
-      ) : null}
-    </section>
-  );
-}
+        <p className="mt-4 text-center text-xs text-slate-400">
+          Development mode: restarting a
+          run resets its trip stops.
+        </p>
+
+        {loading ? (
+          <RunPreparingState />
+        ) : null}
+      </section>
+    );
+  }
 
   if (morningCompleted) {
     return (
@@ -238,15 +304,31 @@ function RunLauncher({
 
         <p className="mt-2 text-sm leading-6 text-slate-600">
           The morning pickup and drop-off
-          cycle is finished. Start the
+          cycle is finished. You can undo
+          the final drop-off or start the
           afternoon run when you are ready.
         </p>
+
+        {recentlyCompletedTripId ? (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={
+              onUndoLastAction
+            }
+            className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ↶ Undo Last Drop-Off
+          </button>
+        ) : null}
 
         <button
           type="button"
           disabled={loading}
-          onClick={onStartAfternoon}
-          className="group mt-6 w-full rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={
+            onStartAfternoon
+          }
+          className="group mt-4 w-full rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
         >
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -301,7 +383,9 @@ function RunLauncher({
       <button
         type="button"
         disabled={loading}
-        onClick={onStartMorning}
+        onClick={
+          onStartMorning
+        }
         className="group mt-6 w-full rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
       >
         <div className="flex items-start justify-between gap-4">
@@ -319,8 +403,8 @@ function RunLauncher({
             </p>
 
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Prepare the morning run and
-              load the first learner
+              Prepare the morning run
+              and load the first learner
               automatically.
             </p>
           </div>
@@ -404,6 +488,7 @@ type WeatherSectionProps = {
     icon: string;
     drivingMessage: string;
   } | null;
+
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -448,9 +533,15 @@ function WeatherSection({
   return (
     <WeatherCard
       location="Port Elizabeth"
-      temperature={weather.temperature}
-      condition={weather.condition}
-      icon={weather.icon}
+      temperature={
+        weather.temperature
+      }
+      condition={
+        weather.condition
+      }
+      icon={
+        weather.icon
+      }
       drivingMessage={
         weather.drivingMessage
       }

@@ -2,7 +2,7 @@ import type {
   ApiResponse,
   DriverDashboard,
   DriverTripStop,
-} from "@/src/types/driver-dashboard"
+} from "@/src/types/driver-dashboard";
 
 function getApiUrl(): string {
   const apiUrl =
@@ -21,7 +21,9 @@ async function readApiResponse<T>(
   response: Response,
 ): Promise<ApiResponse<T>> {
   try {
-    return (await response.json()) as ApiResponse<T>;
+    return (
+      await response.json()
+    ) as ApiResponse<T>;
   } catch {
     return {
       error:
@@ -31,21 +33,26 @@ async function readApiResponse<T>(
 }
 
 export async function fetchDriverDashboard(): Promise<DriverDashboard> {
-  const apiUrl = getApiUrl();
+  const apiUrl =
+    getApiUrl();
 
-  const response = await fetch(
-    `${apiUrl}/driver/me/dashboard`,
-    {
-      cache: "no-store",
-    },
-  );
+  const response =
+    await fetch(
+      `${apiUrl}/driver/me/dashboard`,
+      {
+        cache: "no-store",
+      },
+    );
 
   const result =
     await readApiResponse<DriverDashboard>(
       response,
     );
 
-  if (!response.ok || !result.data) {
+  if (
+    !response.ok ||
+    !result.data
+  ) {
     throw new Error(
       result.error ??
         "Failed to load the driver dashboard.",
@@ -58,20 +65,24 @@ export async function fetchDriverDashboard(): Promise<DriverDashboard> {
 export async function startDriverTrip(
   tripId: string,
 ): Promise<void> {
-  const apiUrl = getApiUrl();
+  const apiUrl =
+    getApiUrl();
 
-  const response = await fetch(
-    `${apiUrl}/driver/trips/${tripId}/start`,
-    {
-      method: "POST",
-    },
-  );
+  const response =
+    await fetch(
+      `${apiUrl}/driver/trips/${tripId}/start`,
+      {
+        method: "POST",
+      },
+    );
 
   const result =
     await readApiResponse<{
       tripId: string;
       status: "in_progress";
-    }>(response);
+    }>(
+      response,
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -85,21 +96,25 @@ export async function notifyParentDriverArrived(
   tripId: string,
   stopId: string,
 ): Promise<void> {
-  const apiUrl = getApiUrl();
+  const apiUrl =
+    getApiUrl();
 
-  const response = await fetch(
-    `${apiUrl}/driver/trips/${tripId}/stops/${stopId}/notify-parent`,
-    {
-      method: "POST",
-    },
-  );
+  const response =
+    await fetch(
+      `${apiUrl}/driver/trips/${tripId}/stops/${stopId}/notify-parent`,
+      {
+        method: "POST",
+      },
+    );
 
   const result =
     await readApiResponse<{
       tripId: string;
       stopId: string;
       notification: string;
-    }>(response);
+    }>(
+      response,
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -110,21 +125,26 @@ export async function notifyParentDriverArrived(
 }
 
 export async function startMorningRun(): Promise<DriverDashboard> {
-  const apiUrl = getApiUrl();
+  const apiUrl =
+    getApiUrl();
 
-  const response = await fetch(
-    `${apiUrl}/driver/me/start-morning-run`,
-    {
-      method: "POST",
-    },
-  );
+  const response =
+    await fetch(
+      `${apiUrl}/driver/me/start-morning-run`,
+      {
+        method: "POST",
+      },
+    );
 
   const result =
     await readApiResponse<DriverDashboard>(
       response,
     );
 
-  if (!response.ok || !result.data) {
+  if (
+    !response.ok ||
+    !result.data
+  ) {
     throw new Error(
       result.error ??
         "Failed to start the morning run.",
@@ -135,21 +155,26 @@ export async function startMorningRun(): Promise<DriverDashboard> {
 }
 
 export async function startAfternoonRun(): Promise<DriverDashboard> {
-  const apiUrl = getApiUrl();
+  const apiUrl =
+    getApiUrl();
 
-  const response = await fetch(
-    `${apiUrl}/driver/me/start-afternoon-run`,
-    {
-      method: "POST",
-    },
-  );
+  const response =
+    await fetch(
+      `${apiUrl}/driver/me/start-afternoon-run`,
+      {
+        method: "POST",
+      },
+    );
 
   const result =
     await readApiResponse<DriverDashboard>(
       response,
     );
 
-  if (!response.ok || !result.data) {
+  if (
+    !response.ok ||
+    !result.data
+  ) {
     throw new Error(
       result.error ??
         "Failed to start the afternoon run.",
@@ -165,26 +190,64 @@ export async function updateDriverTripStop(
   action:
     | "pick-up"
     | "absent"
+    | "no-show"
     | "drop-off",
 ): Promise<DriverTripStop> {
-  const apiUrl = getApiUrl();
+  const apiUrl =
+    getApiUrl();
 
-  const response = await fetch(
-    `${apiUrl}/driver/trips/${tripId}/stops/${stopId}/${action}`,
-    {
-      method: "POST",
-    },
-  );
+  const response =
+    await fetch(
+      `${apiUrl}/driver/trips/${tripId}/stops/${stopId}/${action}`,
+      {
+        method: "POST",
+      },
+    );
 
   const result =
     await readApiResponse<DriverTripStop>(
       response,
     );
 
-  if (!response.ok || !result.data) {
+  if (
+    !response.ok ||
+    !result.data
+  ) {
     throw new Error(
       result.error ??
         "Failed to update the trip stop.",
+    );
+  }
+
+  return result.data;
+}
+
+export async function undoLastDriverAction(
+  tripId: string,
+): Promise<DriverTripStop> {
+  const apiUrl =
+    getApiUrl();
+
+  const response =
+    await fetch(
+      `${apiUrl}/driver/trips/${tripId}/undo`,
+      {
+        method: "POST",
+      },
+    );
+
+  const result =
+    await readApiResponse<DriverTripStop>(
+      response,
+    );
+
+  if (
+    !response.ok ||
+    !result.data
+  ) {
+    throw new Error(
+      result.error ??
+        "Failed to undo the last driver action.",
     );
   }
 

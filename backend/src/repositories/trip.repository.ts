@@ -44,7 +44,8 @@ const TRIP_SELECT = `
 
 export class TripRepository {
   constructor(
-    private readonly supabase: SupabaseClient,
+    private readonly supabase:
+      SupabaseClient,
   ) {}
 
   async markCompleted(
@@ -54,13 +55,23 @@ export class TripRepository {
       await this.supabase
         .from("trips")
         .update({
-          status: "completed",
+          status:
+            "completed",
+
           actual_end:
             new Date().toISOString(),
         })
-        .eq("id", tripId)
-        .eq("status", "in_progress")
-        .select("id")
+        .eq(
+          "id",
+          tripId,
+        )
+        .eq(
+          "status",
+          "in_progress",
+        )
+        .select(
+          "id",
+        )
         .maybeSingle();
 
     if (error) {
@@ -76,6 +87,45 @@ export class TripRepository {
     }
   }
 
+  async reopenCompletedTrip(
+    tripId: string,
+  ): Promise<void> {
+    const { data, error } =
+      await this.supabase
+        .from("trips")
+        .update({
+          status:
+            "in_progress",
+
+          actual_end:
+            null,
+        })
+        .eq(
+          "id",
+          tripId,
+        )
+        .eq(
+          "status",
+          "completed",
+        )
+        .select(
+          "id",
+        )
+        .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Failed to reopen completed trip: ${error.message}`,
+      );
+    }
+
+    if (!data) {
+      throw new Error(
+        "Trip was not found or is not currently completed.",
+      );
+    }
+  }
+
   async markInProgress(
     tripId: string,
   ): Promise<void> {
@@ -83,14 +133,26 @@ export class TripRepository {
       await this.supabase
         .from("trips")
         .update({
-          status: "in_progress",
+          status:
+            "in_progress",
+
           actual_start:
             new Date().toISOString(),
-          actual_end: null,
+
+          actual_end:
+            null,
         })
-        .eq("id", tripId)
-        .eq("status", "scheduled")
-        .select("id")
+        .eq(
+          "id",
+          tripId,
+        )
+        .eq(
+          "status",
+          "scheduled",
+        )
+        .select(
+          "id",
+        )
         .maybeSingle();
 
     if (error) {
@@ -109,9 +171,12 @@ export class TripRepository {
   /**
    * Development/test helper.
    *
-   * Reuses an existing scheduled or completed trip and
-   * starts it again. In production, the back-office route
-   * builder will generate fresh daily trip records instead.
+   * Reuses an existing scheduled or completed
+   * trip and starts it again.
+   *
+   * In production, the back-office route
+   * builder should generate fresh daily trip
+   * records instead.
    */
   async restartForDevelopment(
     tripId: string,
@@ -123,13 +188,26 @@ export class TripRepository {
       await this.supabase
         .from("trips")
         .update({
-          status: "in_progress",
-          actual_start: now,
-          actual_end: null,
+          status:
+            "in_progress",
+
+          actual_start:
+            now,
+
+          actual_end:
+            null,
         })
-        .eq("id", tripId)
-        .neq("status", "cancelled")
-        .select(TRIP_SELECT)
+        .eq(
+          "id",
+          tripId,
+        )
+        .neq(
+          "status",
+          "cancelled",
+        )
+        .select(
+          TRIP_SELECT,
+        )
         .maybeSingle<TripRow>();
 
     if (error) {
@@ -144,7 +222,9 @@ export class TripRepository {
       );
     }
 
-    return this.toDomain(data);
+    return this.toDomain(
+      data,
+    );
   }
 
   async findActiveTripForDriver(
@@ -153,14 +233,27 @@ export class TripRepository {
     const { data, error } =
       await this.supabase
         .from("trips")
-        .select(TRIP_SELECT)
-        .eq("driver_id", driverId)
-        .eq("status", "in_progress")
-        .order("actual_start", {
-          ascending: false,
-          nullsFirst: false,
-        })
-        .limit(1)
+        .select(
+          TRIP_SELECT,
+        )
+        .eq(
+          "driver_id",
+          driverId,
+        )
+        .eq(
+          "status",
+          "in_progress",
+        )
+        .order(
+          "actual_start",
+          {
+            ascending: false,
+            nullsFirst: false,
+          },
+        )
+        .limit(
+          1,
+        )
         .maybeSingle<TripRow>();
 
     if (error) {
@@ -170,7 +263,9 @@ export class TripRepository {
     }
 
     return data
-      ? this.toDomain(data)
+      ? this.toDomain(
+          data,
+        )
       : null;
   }
 
@@ -180,19 +275,32 @@ export class TripRepository {
     const { data, error } =
       await this.supabase
         .from("trips")
-        .select(TRIP_SELECT)
-        .eq("driver_id", driverId)
-        .eq("status", "scheduled")
+        .select(
+          TRIP_SELECT,
+        )
+        .eq(
+          "driver_id",
+          driverId,
+        )
+        .eq(
+          "status",
+          "scheduled",
+        )
         .not(
           "scheduled_start",
           "is",
           null,
         )
-        .order("scheduled_start", {
-          ascending: true,
-          nullsFirst: false,
-        })
-        .limit(1)
+        .order(
+          "scheduled_start",
+          {
+            ascending: true,
+            nullsFirst: false,
+          },
+        )
+        .limit(
+          1,
+        )
         .maybeSingle<TripRow>();
 
     if (error) {
@@ -202,7 +310,9 @@ export class TripRepository {
     }
 
     return data
-      ? this.toDomain(data)
+      ? this.toDomain(
+          data,
+        )
       : null;
   }
 
@@ -212,19 +322,32 @@ export class TripRepository {
     const { data, error } =
       await this.supabase
         .from("trips")
-        .select(TRIP_SELECT)
-        .eq("driver_id", driverId)
-        .eq("status", "completed")
+        .select(
+          TRIP_SELECT,
+        )
+        .eq(
+          "driver_id",
+          driverId,
+        )
+        .eq(
+          "status",
+          "completed",
+        )
         .not(
           "actual_end",
           "is",
           null,
         )
-        .order("actual_end", {
-          ascending: false,
-          nullsFirst: false,
-        })
-        .limit(1)
+        .order(
+          "actual_end",
+          {
+            ascending: false,
+            nullsFirst: false,
+          },
+        )
+        .limit(
+          1,
+        )
         .maybeSingle<TripRow>();
 
     if (error) {
@@ -234,33 +357,53 @@ export class TripRepository {
     }
 
     return data
-      ? this.toDomain(data)
+      ? this.toDomain(
+          data,
+        )
       : null;
   }
 
   /**
-   * Finds the most recent reusable trip matching the
-   * requested morning or afternoon direction.
+   * Finds the most recent reusable trip
+   * matching the requested morning or
+   * afternoon direction.
    */
   async findReusableTripForDriver(
     driverId: string,
-    direction: DriverTripDirection,
+    direction:
+      DriverTripDirection,
   ): Promise<DriverTrip | null> {
     const { data, error } =
       await this.supabase
         .from("trips")
-        .select(TRIP_SELECT)
-        .eq("driver_id", driverId)
-        .eq("direction", direction)
-        .in("status", [
-          "scheduled",
-          "completed",
-        ])
-        .order("scheduled_start", {
-          ascending: false,
-          nullsFirst: false,
-        })
-        .limit(1)
+        .select(
+          TRIP_SELECT,
+        )
+        .eq(
+          "driver_id",
+          driverId,
+        )
+        .eq(
+          "direction",
+          direction,
+        )
+        .in(
+          "status",
+          [
+            "scheduled",
+            "completed",
+          ],
+        )
+        .order(
+          "scheduled_start",
+          {
+            ascending: false,
+            nullsFirst: false,
+          },
+        )
+        .limit(
+          1,
+        )
         .maybeSingle<TripRow>();
 
     if (error) {
@@ -270,7 +413,9 @@ export class TripRepository {
     }
 
     return data
-      ? this.toDomain(data)
+      ? this.toDomain(
+          data,
+        )
       : null;
   }
 
@@ -295,16 +440,26 @@ export class TripRepository {
     row: TripRow,
   ): DriverTrip {
     return {
-      id: row.id,
-      driverId: row.driver_id,
-      direction: row.direction,
+      id:
+        row.id,
+
+      driverId:
+        row.driver_id,
+
+      direction:
+        row.direction,
+
       scheduledStart:
         row.scheduled_start,
+
       actualStart:
         row.actual_start,
+
       actualEnd:
         row.actual_end,
-      status: row.status,
+
+      status:
+        row.status,
     };
   }
 }

@@ -25,6 +25,34 @@ export type DriverTripStop = {
   };
 };
 
+type TripStopDatabaseRow = {
+  id: string;
+  trip_id: string;
+  learner_id: string;
+  sequence: number;
+  status: TripStopStatus;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  picked_up_at: string | null;
+  dropped_off_at: string | null;
+  marked_absent_at: string | null;
+};
+
+const TRIP_STOP_SELECT = `
+  id,
+  trip_id,
+  learner_id,
+  sequence,
+  status,
+  address,
+  latitude,
+  longitude,
+  picked_up_at,
+  dropped_off_at,
+  marked_absent_at
+`;
+
 export class TripStopRepository {
   async resetTripStops(
     tripId: string,
@@ -36,11 +64,20 @@ export class TripStopRepository {
       await supabase
         .from("trip_stops")
         .update({
-          status: "pending",
-          picked_up_at: null,
-          dropped_off_at: null,
-          marked_absent_at: null,
-          updated_at: now,
+          status:
+            "pending",
+
+          picked_up_at:
+            null,
+
+          dropped_off_at:
+            null,
+
+          marked_absent_at:
+            null,
+
+          updated_at:
+            now,
         })
         .eq(
           "trip_id",
@@ -63,19 +100,9 @@ export class TripStopRepository {
     } =
       await supabase
         .from("trip_stops")
-        .select(`
-          id,
-          trip_id,
-          learner_id,
-          sequence,
-          status,
-          address,
-          latitude,
-          longitude,
-          picked_up_at,
-          dropped_off_at,
-          marked_absent_at
-        `)
+        .select(
+          TRIP_STOP_SELECT,
+        )
         .eq(
           "trip_id",
           tripId,
@@ -208,7 +235,7 @@ export class TripStopRepository {
 
     const {
       data: stop,
-      error: updateError,
+      error,
     } =
       await supabase
         .from("trip_stops")
@@ -237,24 +264,14 @@ export class TripStopRepository {
           "status",
           "pending",
         )
-        .select(`
-          id,
-          trip_id,
-          learner_id,
-          sequence,
-          status,
-          address,
-          latitude,
-          longitude,
-          picked_up_at,
-          dropped_off_at,
-          marked_absent_at
-        `)
+        .select(
+          TRIP_STOP_SELECT,
+        )
         .maybeSingle();
 
-    if (updateError) {
+    if (error) {
       throw new Error(
-        `Failed to mark learner as picked up: ${updateError.message}`,
+        `Failed to mark learner as picked up: ${error.message}`,
       );
     }
 
@@ -278,7 +295,7 @@ export class TripStopRepository {
 
     const {
       data: stop,
-      error: updateError,
+      error,
     } =
       await supabase
         .from("trip_stops")
@@ -304,24 +321,14 @@ export class TripStopRepository {
           "status",
           "picked_up",
         )
-        .select(`
-          id,
-          trip_id,
-          learner_id,
-          sequence,
-          status,
-          address,
-          latitude,
-          longitude,
-          picked_up_at,
-          dropped_off_at,
-          marked_absent_at
-        `)
+        .select(
+          TRIP_STOP_SELECT,
+        )
         .maybeSingle();
 
-    if (updateError) {
+    if (error) {
       throw new Error(
-        `Failed to mark learner as dropped off: ${updateError.message}`,
+        `Failed to mark learner as dropped off: ${error.message}`,
       );
     }
 
@@ -345,7 +352,7 @@ export class TripStopRepository {
 
     const {
       data: stop,
-      error: updateError,
+      error,
     } =
       await supabase
         .from("trip_stops")
@@ -374,24 +381,14 @@ export class TripStopRepository {
           "status",
           "pending",
         )
-        .select(`
-          id,
-          trip_id,
-          learner_id,
-          sequence,
-          status,
-          address,
-          latitude,
-          longitude,
-          picked_up_at,
-          dropped_off_at,
-          marked_absent_at
-        `)
+        .select(
+          TRIP_STOP_SELECT,
+        )
         .maybeSingle();
 
-    if (updateError) {
+    if (error) {
       throw new Error(
-        `Failed to mark learner as absent: ${updateError.message}`,
+        `Failed to mark learner as absent: ${error.message}`,
       );
     }
 
@@ -415,7 +412,7 @@ export class TripStopRepository {
 
     const {
       data: stop,
-      error: updateError,
+      error,
     } =
       await supabase
         .from("trip_stops")
@@ -425,9 +422,8 @@ export class TripStopRepository {
 
           /*
            * Temporary:
-           * reuse marked_absent_at until
-           * we add a dedicated
-           * marked_no_show_at column.
+           * no-show currently shares
+           * marked_absent_at.
            */
           marked_absent_at:
             now,
@@ -450,24 +446,14 @@ export class TripStopRepository {
           "status",
           "pending",
         )
-        .select(`
-          id,
-          trip_id,
-          learner_id,
-          sequence,
-          status,
-          address,
-          latitude,
-          longitude,
-          picked_up_at,
-          dropped_off_at,
-          marked_absent_at
-        `)
+        .select(
+          TRIP_STOP_SELECT,
+        )
         .maybeSingle();
 
-    if (updateError) {
+    if (error) {
       throw new Error(
-        `Failed to mark learner as no-show: ${updateError.message}`,
+        `Failed to mark learner as no-show: ${error.message}`,
       );
     }
 
@@ -482,24 +468,211 @@ export class TripStopRepository {
     );
   }
 
+  async undoStopAction(
+    tripId: string,
+    stopId: string,
+  ): Promise<DriverTripStop> {
+    const stops =
+      await this.findByTripId(
+        tripId,
+      );
+
+    const stop =
+      stops.find(
+        (candidate) =>
+          candidate.id ===
+          stopId,
+      );
+
+    if (!stop) {
+      throw new Error(
+        "Trip stop was not found.",
+      );
+    }
+
+    if (
+      stop.status ===
+      "pending"
+    ) {
+      throw new Error(
+        "There is no action to undo for this stop.",
+      );
+    }
+
+    const now =
+      new Date().toISOString();
+
+    let nextStatus:
+      TripStopStatus;
+
+    let updates: {
+      status: TripStopStatus;
+      picked_up_at?: string | null;
+      dropped_off_at?: string | null;
+      marked_absent_at?: string | null;
+      updated_at: string;
+    };
+
+    switch (stop.status) {
+      case "picked_up": {
+        nextStatus =
+          "pending";
+
+        updates = {
+          status:
+            nextStatus,
+
+          picked_up_at:
+            null,
+
+          dropped_off_at:
+            null,
+
+          marked_absent_at:
+            null,
+
+          updated_at:
+            now,
+        };
+
+        break;
+      }
+
+      case "absent": {
+        nextStatus =
+          "pending";
+
+        updates = {
+          status:
+            nextStatus,
+
+          marked_absent_at:
+            null,
+
+          picked_up_at:
+            null,
+
+          dropped_off_at:
+            null,
+
+          updated_at:
+            now,
+        };
+
+        break;
+      }
+
+      case "no_show": {
+        nextStatus =
+          "pending";
+
+        updates = {
+          status:
+            nextStatus,
+
+          marked_absent_at:
+            null,
+
+          picked_up_at:
+            null,
+
+          dropped_off_at:
+            null,
+
+          updated_at:
+            now,
+        };
+
+        break;
+      }
+
+      case "dropped_off": {
+        nextStatus =
+          "picked_up";
+
+        updates = {
+          status:
+            nextStatus,
+
+          /*
+           * Keep picked_up_at because
+           * the learner is back on board.
+           */
+          dropped_off_at:
+            null,
+
+          marked_absent_at:
+            null,
+
+          updated_at:
+            now,
+        };
+
+        break;
+      }
+
+      default: {
+        throw new Error(
+          `Cannot undo stop status ${stop.status}.`,
+        );
+      }
+    }
+
+    const {
+      data: updatedStop,
+      error,
+    } =
+      await supabase
+        .from("trip_stops")
+        .update(
+          updates,
+        )
+        .eq(
+          "id",
+          stopId,
+        )
+        .eq(
+          "trip_id",
+          tripId,
+        )
+        /*
+         * Important concurrency guard:
+         * only undo if the status is still
+         * what we just inspected.
+         */
+        .eq(
+          "status",
+          stop.status,
+        )
+        .select(
+          TRIP_STOP_SELECT,
+        )
+        .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Failed to undo trip stop action: ${error.message}`,
+      );
+    }
+
+    if (!updatedStop) {
+      throw new Error(
+        "The trip stop changed before the undo could be completed.",
+      );
+    }
+
+    return this.attachLearner(
+      updatedStop,
+    );
+  }
+
   private async attachLearner(
-    stop: {
-      id: string;
-      trip_id: string;
-      learner_id: string;
-      sequence: number;
-      status: string;
-      address: string | null;
-      latitude: number | null;
-      longitude: number | null;
-      picked_up_at: string | null;
-      dropped_off_at: string | null;
-      marked_absent_at: string | null;
-    },
+    stop:
+      TripStopDatabaseRow,
   ): Promise<DriverTripStop> {
     const {
       data: learner,
-      error: learnerError,
+      error,
     } =
       await supabase
         .from("learners")
@@ -513,9 +686,9 @@ export class TripStopRepository {
         )
         .maybeSingle();
 
-    if (learnerError) {
+    if (error) {
       throw new Error(
-        `Failed to retrieve learner: ${learnerError.message}`,
+        `Failed to retrieve learner: ${error.message}`,
       );
     }
 

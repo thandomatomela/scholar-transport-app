@@ -14,6 +14,7 @@ import type {
 type TripStopAction =
   | "pick-up"
   | "absent"
+  | "no-show"
   | "drop-off";
 
 type DriverLocation = {
@@ -24,13 +25,18 @@ type DriverLocation = {
 type NextStopCardProps = {
   manifest: DriverTripManifest;
   actionLoading: boolean;
+
   onStopAction: (
     stopId: string,
     action: TripStopAction,
   ) => Promise<void>;
+
   onNotifyParent: (
     stopId: string,
   ) => Promise<void>;
+
+  onUndoLastAction:
+    () => Promise<void>;
 };
 
 const DOORBELL_DISTANCE_METRES = 100;
@@ -45,6 +51,7 @@ export function NextStopCard({
   actionLoading,
   onStopAction,
   onNotifyParent,
+  onUndoLastAction,
 }: NextStopCardProps) {
   const stop =
     manifest.nextStop;
@@ -79,16 +86,6 @@ export function NextStopCard({
   }, [stop?.id]);
 
   useEffect(() => {
-    /*
-     * When the development bypass is enabled,
-     * geolocation is not required in order to
-     * test the doorbell.
-     *
-     * We still allow location tracking when
-     * available so the UI can display distance,
-     * but location errors will not prevent the
-     * button from being used.
-     */
     if (!navigator.geolocation) {
       if (!ALLOW_DOORBELL_BYPASS) {
         setLocationError(
@@ -204,14 +201,6 @@ export function NextStopCard({
     stop.latitude !== null &&
     stop.longitude !== null;
 
-  /*
-   * Production:
-   * Driver must be within 100 metres.
-   *
-   * Development/testing:
-   * NEXT_PUBLIC_ALLOW_DOORBELL_BYPASS=true
-   * overrides the geofence.
-   */
   const isWithinDoorbellRange =
     ALLOW_DOORBELL_BYPASS ||
     (
@@ -365,9 +354,16 @@ export function NextStopCard({
 
           <button
             type="button"
-            disabled
-            title="No-show backend action still needs to be implemented."
-            className="cursor-not-allowed rounded-2xl bg-red-100 px-4 py-3 font-semibold text-red-400"
+            disabled={
+              actionLoading
+            }
+            onClick={() => {
+              void onStopAction(
+                stop.id,
+                "no-show",
+              );
+            }}
+            className="rounded-2xl bg-red-100 px-4 py-3 font-semibold text-red-900 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             No Show
           </button>
@@ -375,18 +371,18 @@ export function NextStopCard({
       ) : null}
 
       <button
-        type="button"
-        disabled
-        title="Undo backend action still needs to be implemented."
-        className="mt-3 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-400"
-      >
-        ↶ Undo Last Action
-      </button>
+  type="button"
+  disabled={actionLoading}
+  onClick={() => {
+    void onUndoLastAction();
+  }}
+  className="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  ↶ Undo Last Action
+</button>
 
       <p className="mt-3 text-center text-xs text-slate-400">
-        No Show and Undo are displayed
-        as workflow reminders until
-        their backend actions are added.
+        Undo reverses the most recent driver action.
       </p>
     </section>
   );

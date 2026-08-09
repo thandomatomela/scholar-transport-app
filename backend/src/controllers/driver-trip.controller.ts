@@ -16,7 +16,9 @@ const tripStopRepository =
   new TripStopRepository();
 
 const tripRepository =
-  new TripRepository(supabase);
+  new TripRepository(
+    supabase,
+  );
 
 const driverTripService =
   new DriverTripService(
@@ -25,9 +27,14 @@ const driverTripService =
   );
 
 function getRouteParameter(
-  value: string | string[] | undefined,
+  value:
+    | string
+    | string[]
+    | undefined,
 ): string | undefined {
-  return Array.isArray(value)
+  return Array.isArray(
+    value,
+  )
     ? value[0]
     : value;
 }
@@ -44,9 +51,18 @@ function getConflictStatusCode(
   message: string,
 ): number {
   if (
-    message.includes("not found") ||
-    message.includes("no longer") ||
-    message.includes("not currently")
+    message.includes(
+      "not found",
+    ) ||
+    message.includes(
+      "no longer",
+    ) ||
+    message.includes(
+      "not currently",
+    ) ||
+    message.includes(
+      "no driver action to undo",
+    )
   ) {
     return 409;
   }
@@ -68,18 +84,26 @@ export async function startMorningRun(
         TEST_DRIVER_ID,
       );
 
-    response.status(200).json({
-      data: dashboard,
-    });
+    response
+      .status(200)
+      .json({
+        data: dashboard,
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
-    response.status(
-      getConflictStatusCode(message),
-    ).json({
-      error: message,
-    });
+    response
+      .status(
+        getConflictStatusCode(
+          message,
+        ),
+      )
+      .json({
+        error: message,
+      });
   }
 }
 
@@ -97,18 +121,26 @@ export async function startAfternoonRun(
         TEST_DRIVER_ID,
       );
 
-    response.status(200).json({
-      data: dashboard,
-    });
+    response
+      .status(200)
+      .json({
+        data: dashboard,
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
-    response.status(
-      getConflictStatusCode(message),
-    ).json({
-      error: message,
-    });
+    response
+      .status(
+        getConflictStatusCode(
+          message,
+        ),
+      )
+      .json({
+        error: message,
+      });
   }
 }
 
@@ -119,21 +151,26 @@ export async function getDriverDashboard(
 ): Promise<void> {
   try {
     /*
-     * Temporary until authentication is implemented.
+     * Temporary until authentication
+     * is implemented.
      *
-     * Later, replace TEST_DRIVER_ID with the
-     * authenticated driver's ID.
+     * Later, replace TEST_DRIVER_ID
+     * with the authenticated driver's ID.
      */
     const dashboard =
       await driverTripService.getDriverDashboard(
         TEST_DRIVER_ID,
       );
 
-    response.status(200).json({
-      data: dashboard,
-    });
+    response
+      .status(200)
+      .json({
+        data: dashboard,
+      });
   } catch (error) {
-    next(error);
+    next(
+      error,
+    );
   }
 }
 
@@ -149,19 +186,25 @@ export async function getCurrentDriverTrip(
       );
 
     if (!currentTrip) {
-      response.status(404).json({
-        error:
-          "No active or upcoming trip was found.",
-      });
+      response
+        .status(404)
+        .json({
+          error:
+            "No active or upcoming trip was found.",
+        });
 
       return;
     }
 
-    response.status(200).json({
-      data: currentTrip,
-    });
+    response
+      .status(200)
+      .json({
+        data: currentTrip,
+      });
   } catch (error) {
-    next(error);
+    next(
+      error,
+    );
   }
 }
 
@@ -173,14 +216,17 @@ export async function getDriverTripManifest(
   try {
     const tripId =
       getRouteParameter(
-        request.params.tripId,
+        request.params
+          .tripId,
       );
 
     if (!tripId) {
-      response.status(400).json({
-        error:
-          "Trip ID is required.",
-      });
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID is required.",
+        });
 
       return;
     }
@@ -190,11 +236,15 @@ export async function getDriverTripManifest(
         tripId,
       );
 
-    response.status(200).json({
-      data: manifest,
-    });
+    response
+      .status(200)
+      .json({
+        data: manifest,
+      });
   } catch (error) {
-    next(error);
+    next(
+      error,
+    );
   }
 }
 
@@ -205,14 +255,17 @@ export async function startDriverTrip(
   try {
     const tripId =
       getRouteParameter(
-        request.params.tripId,
+        request.params
+          .tripId,
       );
 
     if (!tripId) {
-      response.status(400).json({
-        error:
-          "Trip ID is required.",
-      });
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID is required.",
+        });
 
       return;
     }
@@ -221,21 +274,31 @@ export async function startDriverTrip(
       tripId,
     );
 
-    response.status(200).json({
-      data: {
-        tripId,
-        status: "in_progress",
-      },
-    });
+    response
+      .status(200)
+      .json({
+        data: {
+          tripId,
+          status:
+            "in_progress",
+        },
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
-    response.status(
-      getConflictStatusCode(message),
-    ).json({
-      error: message,
-    });
+    response
+      .status(
+        getConflictStatusCode(
+          message,
+        ),
+      )
+      .json({
+        error:
+          message,
+      });
   }
 }
 
@@ -246,19 +309,26 @@ export async function pickUpLearner(
   try {
     const tripId =
       getRouteParameter(
-        request.params.tripId,
+        request.params
+          .tripId,
       );
 
     const stopId =
       getRouteParameter(
-        request.params.stopId,
+        request.params
+          .stopId,
       );
 
-    if (!tripId || !stopId) {
-      response.status(400).json({
-        error:
-          "Trip ID and stop ID are required.",
-      });
+    if (
+      !tripId ||
+      !stopId
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID and stop ID are required.",
+        });
 
       return;
     }
@@ -269,12 +339,17 @@ export async function pickUpLearner(
         stopId,
       );
 
-    response.status(200).json({
-      data: tripStop,
-    });
+    response
+      .status(200)
+      .json({
+        data:
+          tripStop,
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
     const statusCode =
       message.includes(
@@ -283,9 +358,14 @@ export async function pickUpLearner(
         ? 409
         : 500;
 
-    response.status(statusCode).json({
-      error: message,
-    });
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
   }
 }
 
@@ -296,19 +376,26 @@ export async function markLearnerAbsent(
   try {
     const tripId =
       getRouteParameter(
-        request.params.tripId,
+        request.params
+          .tripId,
       );
 
     const stopId =
       getRouteParameter(
-        request.params.stopId,
+        request.params
+          .stopId,
       );
 
-    if (!tripId || !stopId) {
-      response.status(400).json({
-        error:
-          "Trip ID and stop ID are required.",
-      });
+    if (
+      !tripId ||
+      !stopId
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID and stop ID are required.",
+        });
 
       return;
     }
@@ -319,12 +406,17 @@ export async function markLearnerAbsent(
         stopId,
       );
 
-    response.status(200).json({
-      data: tripStop,
-    });
+    response
+      .status(200)
+      .json({
+        data:
+          tripStop,
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
     const statusCode =
       message.includes(
@@ -333,9 +425,81 @@ export async function markLearnerAbsent(
         ? 409
         : 500;
 
-    response.status(statusCode).json({
-      error: message,
-    });
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
+  }
+}
+
+export async function markLearnerNoShow(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const tripId =
+      getRouteParameter(
+        request.params
+          .tripId,
+      );
+
+    const stopId =
+      getRouteParameter(
+        request.params
+          .stopId,
+      );
+
+    if (
+      !tripId ||
+      !stopId
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID and stop ID are required.",
+        });
+
+      return;
+    }
+
+    const tripStop =
+      await driverTripService.markLearnerNoShow(
+        tripId,
+        stopId,
+      );
+
+    response
+      .status(200)
+      .json({
+        data:
+          tripStop,
+      });
+  } catch (error) {
+    const message =
+      getErrorMessage(
+        error,
+      );
+
+    const statusCode =
+      message.includes(
+        "not found or is no longer pending",
+      )
+        ? 409
+        : 500;
+
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
   }
 }
 
@@ -346,19 +510,26 @@ export async function notifyParentDriverArrived(
   try {
     const tripId =
       getRouteParameter(
-        request.params.tripId,
+        request.params
+          .tripId,
       );
 
     const stopId =
       getRouteParameter(
-        request.params.stopId,
+        request.params
+          .stopId,
       );
 
-    if (!tripId || !stopId) {
-      response.status(400).json({
-        error:
-          "Trip ID and stop ID are required.",
-      });
+    if (
+      !tripId ||
+      !stopId
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID and stop ID are required.",
+        });
 
       return;
     }
@@ -368,17 +539,21 @@ export async function notifyParentDriverArrived(
       stopId,
     );
 
-    response.status(200).json({
-      data: {
-        tripId,
-        stopId,
-        notification:
-          "Parent arrival notification requested.",
-      },
-    });
+    response
+      .status(200)
+      .json({
+        data: {
+          tripId,
+          stopId,
+          notification:
+            "Parent arrival notification requested.",
+        },
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
     const statusCode =
       message.includes(
@@ -387,9 +562,14 @@ export async function notifyParentDriverArrived(
         ? 404
         : 500;
 
-    response.status(statusCode).json({
-      error: message,
-    });
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
   }
 }
 
@@ -400,19 +580,26 @@ export async function dropOffLearner(
   try {
     const tripId =
       getRouteParameter(
-        request.params.tripId,
+        request.params
+          .tripId,
       );
 
     const stopId =
       getRouteParameter(
-        request.params.stopId,
+        request.params
+          .stopId,
       );
 
-    if (!tripId || !stopId) {
-      response.status(400).json({
-        error:
-          "Trip ID and stop ID are required.",
-      });
+    if (
+      !tripId ||
+      !stopId
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID and stop ID are required.",
+        });
 
       return;
     }
@@ -423,12 +610,17 @@ export async function dropOffLearner(
         stopId,
       );
 
-    response.status(200).json({
-      data: tripStop,
-    });
+    response
+      .status(200)
+      .json({
+        data:
+          tripStop,
+      });
   } catch (error) {
     const message =
-      getErrorMessage(error);
+      getErrorMessage(
+        error,
+      );
 
     const statusCode =
       message.includes(
@@ -437,8 +629,79 @@ export async function dropOffLearner(
         ? 409
         : 500;
 
-    response.status(statusCode).json({
-      error: message,
-    });
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
+  }
+}
+
+export async function undoLastDriverAction(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const tripId =
+      getRouteParameter(
+        request.params
+          .tripId,
+      );
+
+    if (!tripId) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID is required.",
+        });
+
+      return;
+    }
+
+    const tripStop =
+      await driverTripService.undoLastAction(
+        tripId,
+      );
+
+    response
+      .status(200)
+      .json({
+        data:
+          tripStop,
+      });
+  } catch (error) {
+    const message =
+      getErrorMessage(
+        error,
+      );
+
+    const statusCode =
+      message.includes(
+        "no driver action to undo",
+      ) ||
+      message.includes(
+        "There is no action to undo",
+      ) ||
+      message.includes(
+        "not found",
+      ) ||
+      message.includes(
+        "changed before the undo",
+      )
+        ? 409
+        : 500;
+
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
   }
 }

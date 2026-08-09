@@ -1,4 +1,6 @@
-import { Router } from "express";
+import {
+  Router,
+} from "express";
 
 import {
   dropOffLearner,
@@ -6,14 +8,17 @@ import {
   getDriverDashboard,
   getDriverTripManifest,
   markLearnerAbsent,
+  markLearnerNoShow,
   notifyParentDriverArrived,
   pickUpLearner,
   startAfternoonRun,
   startDriverTrip,
   startMorningRun,
+  undoLastDriverAction,
 } from "../controllers/driver-trip.controller.js";
 
-export const driverTripRouter = Router();
+export const driverTripRouter =
+  Router();
 
 driverTripRouter.get(
   "/me/dashboard",
@@ -61,6 +66,16 @@ driverTripRouter.post(
 );
 
 driverTripRouter.post(
+  "/trips/:tripId/stops/:stopId/no-show",
+  markLearnerNoShow,
+);
+
+driverTripRouter.post(
   "/trips/:tripId/stops/:stopId/drop-off",
   dropOffLearner,
+);
+
+driverTripRouter.post(
+  "/trips/:tripId/undo",
+  undoLastDriverAction,
 );
