@@ -20,6 +20,7 @@ export type NotificationMessage = {
 };
 
 const TEMPORARY_ETA_MINUTES = "5";
+const WHATSAPP_LANGUAGE_CODE = "en";
 
 function getFirstName(
   fullName: string,
@@ -132,57 +133,136 @@ export function buildNotificationMessage(
         "Via Nova Scholar Transport",
       ].join("\n");
 
+      /*
+       * Current approved Meta template order:
+       *
+       * {{1}} Parent name
+       * {{2}} Pickup address
+       * {{3}} ETA minutes
+       * {{4}} Learner name
+       */
       whatsappTemplate = {
         name:
           "driver_on_the_way",
 
-        /*
-         * This must exactly match the language
-         * shown for the approved Meta template.
-         *
-         * Your template was created as English,
-         * which normally uses "en".
-         */
-        languageCode: "en",
+        languageCode:
+          WHATSAPP_LANGUAGE_CODE,
 
-        /*
-         * Variable order must match Meta:
-         *
-         * {{1}} Parent name
-         * {{2}} Learner name
-         * {{3}} Pickup address
-         * {{4}} ETA minutes
-         */
         parameters: [
-  recipientFirstName,        // {{1}}
-  pickupAddress,             // {{2}}
-  TEMPORARY_ETA_MINUTES,     // {{3}}
-  learnerNames,              // {{4}}
-],
+          recipientFirstName,
+          pickupAddress,
+          TEMPORARY_ETA_MINUTES,
+          learnerNames,
+        ],
       };
 
       break;
     }
 
-    case "driver_arrived":
+    case "driver_arrived": {
       title =
         "Driver Arrived";
 
       body = [
-        `Hi ${recipientFirstName},`,
+        `Good day ${recipientFirstName},`,
         "",
-        `The driver has arrived for ${learnerNames}.`,
+        `The driver has arrived at the pickup location for ${learnerNames}.`,
         "",
-        `Please meet the driver at the agreed ${
-          plural
-            ? "collection or drop-off points"
-            : "collection or drop-off point"
-        }.`,
+        `Please bring ${learnerNames} to the agreed pickup point.`,
+        "",
+        "Thank you,",
+        "Via Nova Scholar Transport",
       ].join("\n");
 
-      break;
+      whatsappTemplate = {
+        name:
+          "driver_arrived",
 
-    case "picked_up":
+        languageCode:
+          WHATSAPP_LANGUAGE_CODE,
+
+        parameters: [
+          recipientFirstName,
+          learnerNames,
+        ],
+      };
+
+      break;
+    }
+
+    case "picked_up": {
+      if (
+        notification.tripDirection ===
+        "home_to_school"
+      ) {
+        title =
+          "Learner Picked Up";
+
+        body = [
+          `Good day ${recipientFirstName},`,
+          "",
+          `${learnerNames} ${
+            plural ? "have" : "has"
+          } been safely picked up from home and ${
+            plural ? "are" : "is"
+          } now on the way to school.`,
+          "",
+          "Thank you,",
+          "Via Nova Scholar Transport",
+        ].join("\n");
+
+        whatsappTemplate = {
+          name:
+            "learner_picked_up_from_home",
+
+          languageCode:
+            WHATSAPP_LANGUAGE_CODE,
+
+          parameters: [
+            recipientFirstName,
+            learnerNames,
+          ],
+        };
+
+        break;
+      }
+
+      if (
+        notification.tripDirection ===
+        "school_to_home"
+      ) {
+        title =
+          "Learner Picked Up";
+
+        body = [
+          `Good day ${recipientFirstName},`,
+          "",
+          `${learnerNames} ${
+            plural ? "have" : "has"
+          } been safely picked up from school and ${
+            plural ? "are" : "is"
+          } now on the way home.`,
+          "",
+          "Thank you,",
+          "Via Nova Scholar Transport",
+        ].join("\n");
+
+        whatsappTemplate = {
+          name:
+            "learner_picked_up_from_school",
+
+          languageCode:
+            WHATSAPP_LANGUAGE_CODE,
+
+          parameters: [
+            recipientFirstName,
+            learnerNames,
+          ],
+        };
+
+        break;
+      }
+
       body = [
         `Hi ${recipientFirstName},`,
         "",
@@ -191,15 +271,17 @@ export function buildNotificationMessage(
         } been safely picked up and ${
           plural ? "are" : "is"
         } now on board.`,
-        "",
-        "Thank you for choosing our scholar transport service.",
       ].join("\n");
 
       break;
+    }
 
-    case "next_for_dropoff":
+    case "next_for_dropoff": {
+      title =
+        "Next For Drop-Off";
+
       body = [
-        `Hi ${recipientFirstName},`,
+        `Good day ${recipientFirstName},`,
         "",
         `${learnerNames} ${
           plural ? "are" : "is"
@@ -208,26 +290,178 @@ export function buildNotificationMessage(
         `Please be ready to receive ${
           plural
             ? "them"
-            : "your child"
-        }.`,
+            : learnerNames
+        } at the agreed drop-off location.`,
+        "",
+        "Thank you,",
+        "Via Nova Scholar Transport",
       ].join("\n");
 
-      break;
+      whatsappTemplate = {
+        name:
+          "learner_next_for_dropoff",
 
-    case "dropped_off":
+        languageCode:
+          WHATSAPP_LANGUAGE_CODE,
+
+        parameters: [
+          recipientFirstName,
+          learnerNames,
+        ],
+      };
+
+      break;
+    }
+
+    case "dropped_off": {
+      if (
+        notification.tripDirection ===
+        "home_to_school"
+      ) {
+        title =
+          "Learner Dropped Off";
+
+        body = [
+          `Good day ${recipientFirstName},`,
+          "",
+          `${learnerNames} ${
+            plural ? "have" : "has"
+          } been safely dropped off at school.`,
+          "",
+          "Thank you,",
+          "Via Nova Scholar Transport",
+        ].join("\n");
+
+        whatsappTemplate = {
+          name:
+            "learner_dropped_off_at_school",
+
+          languageCode:
+            WHATSAPP_LANGUAGE_CODE,
+
+          parameters: [
+            recipientFirstName,
+            learnerNames,
+          ],
+        };
+
+        break;
+      }
+
+      if (
+        notification.tripDirection ===
+        "school_to_home"
+      ) {
+        title =
+          "Learner Dropped Off";
+
+        body = [
+          `Good day ${recipientFirstName},`,
+          "",
+          `${learnerNames} ${
+            plural ? "have" : "has"
+          } been safely dropped off at home.`,
+          "",
+          "Thank you,",
+          "Via Nova Scholar Transport",
+        ].join("\n");
+
+        whatsappTemplate = {
+          name:
+            "learner_dropped_off_at_home",
+
+          languageCode:
+            WHATSAPP_LANGUAGE_CODE,
+
+          parameters: [
+            recipientFirstName,
+            learnerNames,
+          ],
+        };
+
+        break;
+      }
+
       body = [
         `Hi ${recipientFirstName},`,
         "",
         `${learnerNames} ${
           plural ? "have" : "has"
         } been safely dropped off.`,
-        "",
-        "Thank you for choosing our scholar transport service.",
       ].join("\n");
 
       break;
+    }
 
-    case "trip_created":
+    case "learner_absent": {
+      title =
+        "Learner Absent";
+
+      body = [
+        `Good day ${recipientFirstName},`,
+        "",
+        `${learnerNames} ${
+          plural ? "have" : "has"
+        } been marked absent for today's transport run.`,
+        "",
+        "Please contact the transport office if this is incorrect.",
+        "",
+        "Thank you,",
+        "Via Nova Scholar Transport",
+      ].join("\n");
+
+      whatsappTemplate = {
+        name:
+          "learner_absent",
+
+        languageCode:
+          WHATSAPP_LANGUAGE_CODE,
+
+        parameters: [
+          recipientFirstName,
+          learnerNames,
+        ],
+      };
+
+      break;
+    }
+
+    case "learner_no_show": {
+      title =
+        "Learner No Show";
+
+      body = [
+        `Good day ${recipientFirstName},`,
+        "",
+        `${learnerNames} ${
+          plural ? "were" : "was"
+        } not available for collection when the driver arrived.`,
+        "",
+        "The learner has been marked as a no-show for this transport run.",
+        "",
+        "Please contact Via Nova Scholar Transport if this is incorrect.",
+        "",
+        "Thank you,",
+        "Via Nova Scholar Transport",
+      ].join("\n");
+
+      whatsappTemplate = {
+        name:
+          "learner_no_show",
+
+        languageCode:
+          WHATSAPP_LANGUAGE_CODE,
+
+        parameters: [
+          recipientFirstName,
+          learnerNames,
+        ],
+      };
+
+      break;
+    }
+
+    case "trip_created": {
       body = [
         `Hi ${recipientFirstName},`,
         "",
@@ -235,23 +469,30 @@ export function buildNotificationMessage(
       ].join("\n");
 
       break;
+    }
 
-    default:
+    default: {
       body = [
         `Hi ${recipientFirstName},`,
         "",
         `There is a new transport update regarding ${learnerNames}.`,
       ].join("\n");
+    }
   }
 
   return {
     title,
     body,
+
     eventType:
       notification.eventType,
+
     learnerNames:
       notification.learnerNames,
-    trackingLink: null,
+
+    trackingLink:
+      null,
+
     whatsappTemplate,
   };
 }

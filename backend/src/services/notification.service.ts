@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+
 import type {
   TripEventType,
 } from "./trip.service.js";
@@ -6,7 +7,9 @@ import type {
 export type NotificationEventType =
   | TripEventType
   | "driver_arrived"
-  | "driver_on_the_way";
+  | "driver_on_the_way"
+  | "learner_absent"
+  | "learner_no_show";
 
 type NotificationPreferenceColumn =
   | "receive_pickup_notifications"
@@ -26,12 +29,14 @@ function getPreferenceColumn(
 ): NotificationPreferenceColumn | null {
   switch (eventType) {
     case "picked_up":
+    case "learner_absent":
+    case "learner_no_show":
       return "receive_pickup_notifications";
 
     case "next_for_dropoff":
-case "driver_arrived":
-case "driver_on_the_way":
-  return "receive_tracking_link";
+    case "driver_arrived":
+    case "driver_on_the_way":
+      return "receive_tracking_link";
 
     case "dropped_off":
       return "receive_dropoff_notifications";
@@ -46,32 +51,44 @@ export async function getNotificationRecipients(
   eventType: NotificationEventType,
 ): Promise<NotificationRecipient[]> {
   const preferenceColumn =
-    getPreferenceColumn(eventType);
+    getPreferenceColumn(
+      eventType,
+    );
 
   if (!preferenceColumn) {
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("learner_contacts")
-    .select(`
-      notification_priority,
-      receive_pickup_notifications,
-      receive_tracking_link,
-      receive_dropoff_notifications,
-      contact:contacts (
-        id,
-        full_name,
-        phone_number,
-        relationship,
-        whatsapp_enabled
+  const { data, error } =
+    await supabase
+      .from("learner_contacts")
+      .select(`
+        notification_priority,
+        receive_pickup_notifications,
+        receive_tracking_link,
+        receive_dropoff_notifications,
+        contact:contacts (
+          id,
+          full_name,
+          phone_number,
+          relationship,
+          whatsapp_enabled
+        )
+      `)
+      .eq(
+        "learner_id",
+        learnerId,
       )
-    `)
-    .eq("learner_id", learnerId)
-    .eq(preferenceColumn, true)
-    .order("notification_priority", {
-      ascending: true,
-    });
+      .eq(
+        preferenceColumn,
+        true,
+      )
+      .order(
+        "notification_priority",
+        {
+          ascending: true,
+        },
+      );
 
   if (error) {
     throw new Error(
@@ -79,12 +96,14 @@ export async function getNotificationRecipients(
     );
   }
 
-  const recipients: NotificationRecipient[] = [];
+  const recipients:
+    NotificationRecipient[] = [];
 
   for (const row of data ?? []) {
-    const contact = Array.isArray(row.contact)
-      ? row.contact[0]
-      : row.contact;
+    const contact =
+      Array.isArray(row.contact)
+        ? row.contact[0]
+        : row.contact;
 
     if (
       !contact ||
@@ -95,11 +114,19 @@ export async function getNotificationRecipients(
     }
 
     recipients.push({
-      contactId: contact.id,
-      fullName: contact.full_name,
-      phoneNumber: contact.phone_number,
+      contactId:
+        contact.id,
+
+      fullName:
+        contact.full_name,
+
+      phoneNumber:
+        contact.phone_number,
+
       relationship:
-        contact.relationship ?? null,
+        contact.relationship ??
+        null,
+
       priority:
         typeof row.notification_priority ===
         "number"

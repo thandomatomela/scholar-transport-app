@@ -194,14 +194,17 @@ async startAfternoonRun(
     });
   }
 
-  async pickUpLearner(
+ async pickUpLearner(
   tripId: string,
   stopId: string,
 ): Promise<DriverTripStop> {
-  console.log("Starting learner pickup:", {
-    tripId,
-    stopId,
-  });
+  console.log(
+    "Starting learner pickup:",
+    {
+      tripId,
+      stopId,
+    },
+  );
 
   const updatedStop =
     await this.tripStopRepository.markPickedUp(
@@ -209,30 +212,111 @@ async startAfternoonRun(
       stopId,
     );
 
-  console.log("Learner marked as picked up:", {
-    stopId: updatedStop.id,
-    learnerId: updatedStop.learnerId,
-    learnerName: updatedStop.learner.fullName,
+  console.log(
+    "Learner marked as picked up:",
+    {
+      stopId:
+        updatedStop.id,
+      learnerId:
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
+
+  /*
+   * Notify the picked-up learner's parent.
+   *
+   * The notification message builder will
+   * inspect tripDirection and choose:
+   *
+   * home_to_school
+   *   -> learner_picked_up_from_home
+   *
+   * school_to_home
+   *   -> learner_picked_up_from_school
+   */
+  console.log(
+    "Publishing picked_up event:",
+    {
+      tripId,
+      learnerId:
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
+
+  await publishDomainEvent({
+    type:
+      "trip.state_changed",
+
+    tripId,
+
+    learnerId:
+      updatedStop.learnerId,
+
+    eventType:
+      "picked_up",
+
+    previousStatus:
+      "waiting_for_pickup",
+
+    newStatus:
+      "on_board",
+
+    occurredAt:
+      new Date().toISOString(),
   });
 
+  console.log(
+    "picked_up event published.",
+  );
+
+  /*
+   * Now determine the next learner.
+   */
   const manifest =
-    await this.getTripManifest(tripId);
+    await this.getTripManifest(
+      tripId,
+    );
 
-  console.log("Manifest after pickup:", {
-    currentPhase: manifest.currentPhase,
-    nextAction: manifest.nextAction,
-    nextStopId: manifest.nextStop?.id ?? null,
-    nextLearnerId:
-      manifest.nextStop?.learnerId ?? null,
-    nextLearnerName:
-      manifest.nextStop?.learner.fullName ?? null,
-  });
+  console.log(
+    "Manifest after pickup:",
+    {
+      currentPhase:
+        manifest.currentPhase,
+
+      nextAction:
+        manifest.nextAction,
+
+      nextStopId:
+        manifest.nextStop?.id ??
+        null,
+
+      nextLearnerId:
+        manifest.nextStop
+          ?.learnerId ??
+        null,
+
+      nextLearnerName:
+        manifest.nextStop
+          ?.learner.fullName ??
+        null,
+    },
+  );
 
   const nextStop =
-    manifest.currentPhase === "pickup"
+    manifest.currentPhase ===
+    "pickup"
       ? manifest.nextStop
       : null;
 
+  /*
+   * If all learners have now been picked up,
+   * there is nobody else to send an
+   * on-the-way notification to.
+   */
   if (!nextStop) {
     console.log(
       "No next pickup stop found. On-the-way notification not published.",
@@ -245,21 +329,39 @@ async startAfternoonRun(
     "Publishing driver.on_the_way:",
     {
       tripId,
-      stopId: nextStop.id,
-      learnerId: nextStop.learnerId,
+
+      stopId:
+        nextStop.id,
+
+      learnerId:
+        nextStop.learnerId,
+
       learnerName:
         nextStop.learner.fullName,
+
+      address:
+        nextStop.address,
     },
   );
 
   await publishDomainEvent({
-  type: "driver.on_the_way",
-  tripId,
-  stopId: nextStop.id,
-  learnerId: nextStop.learnerId,
-  address: nextStop.address,
-  occurredAt: new Date().toISOString(),
-});
+    type:
+      "driver.on_the_way",
+
+    tripId,
+
+    stopId:
+      nextStop.id,
+
+    learnerId:
+      nextStop.learnerId,
+
+    address:
+      nextStop.address,
+
+    occurredAt:
+      new Date().toISOString(),
+  });
 
   console.log(
     "driver.on_the_way event published.",
@@ -268,38 +370,271 @@ async startAfternoonRun(
   return updatedStop;
 }
   async markLearnerAbsent(
-    tripId: string,
-    stopId: string,
-  ): Promise<DriverTripStop> {
-    return this.tripStopRepository.markAbsent(
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  console.log(
+    "Starting learner absence:",
+    {
+      tripId,
+      stopId,
+    },
+  );
+
+  const updatedStop =
+    await this.tripStopRepository.markAbsent(
       tripId,
       stopId,
     );
-  }
+
+  console.log(
+    "Learner marked as absent:",
+    {
+      stopId:
+        updatedStop.id,
+      learnerId:
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
+
+  await publishDomainEvent({
+    type:
+      "learner.absent",
+
+    tripId,
+
+    stopId:
+      updatedStop.id,
+
+    learnerId:
+      updatedStop.learnerId,
+
+    occurredAt:
+      new Date().toISOString(),
+  });
+
+  console.log(
+    "learner.absent event published.",
+  );
+
+  return updatedStop;
+}
+
+async markLearnerNoShow(
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  console.log(
+    "Starting learner no-show:",
+    {
+      tripId,
+      stopId,
+    },
+  );
+
+  const updatedStop =
+    await this.tripStopRepository.markNoShow(
+      tripId,
+      stopId,
+    );
+
+  console.log(
+    "Learner marked as no-show:",
+    {
+      stopId:
+        updatedStop.id,
+      learnerId:
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
+
+  await publishDomainEvent({
+    type:
+      "learner.no_show",
+
+    tripId,
+
+    stopId:
+      updatedStop.id,
+
+    learnerId:
+      updatedStop.learnerId,
+
+    occurredAt:
+      new Date().toISOString(),
+  });
+
+  console.log(
+    "learner.no_show event published.",
+  );
+
+  return updatedStop;
+}
 
   async dropOffLearner(
-    tripId: string,
-    stopId: string,
-  ): Promise<DriverTripStop> {
-    const updatedStop =
-      await this.tripStopRepository.markDroppedOff(
-        tripId,
-        stopId,
-      );
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  console.log(
+    "Starting learner drop-off:",
+    {
+      tripId,
+      stopId,
+    },
+  );
 
-    const manifest =
-      await this.getTripManifest(tripId);
+  const updatedStop =
+    await this.tripStopRepository.markDroppedOff(
+      tripId,
+      stopId,
+    );
 
-    if (
-      manifest.currentPhase === "complete"
-    ) {
-      await this.tripRepository.markCompleted(
-        tripId,
-      );
-    }
+  console.log(
+    "Learner marked as dropped off:",
+    {
+      stopId:
+        updatedStop.id,
+      learnerId:
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
+
+  console.log(
+    "Publishing dropped_off event:",
+    {
+      tripId,
+      learnerId:
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
+
+  await publishDomainEvent({
+    type:
+      "trip.state_changed",
+
+    tripId,
+
+    learnerId:
+      updatedStop.learnerId,
+
+    eventType:
+      "dropped_off",
+
+    previousStatus:
+      "next_for_dropoff",
+
+    newStatus:
+      "completed",
+
+    occurredAt:
+      new Date().toISOString(),
+  });
+
+  console.log(
+    "dropped_off event published.",
+  );
+
+  const manifest =
+    await this.getTripManifest(
+      tripId,
+    );
+
+  console.log(
+    "Manifest after drop-off:",
+    {
+      currentPhase:
+        manifest.currentPhase,
+
+      nextAction:
+        manifest.nextAction,
+
+      nextStopId:
+        manifest.nextStop?.id ??
+        null,
+
+      nextLearnerId:
+        manifest.nextStop
+          ?.learnerId ??
+        null,
+
+      nextLearnerName:
+        manifest.nextStop
+          ?.learner.fullName ??
+        null,
+    },
+  );
+
+  if (
+    manifest.currentPhase ===
+      "complete" ||
+    !manifest.nextStop
+  ) {
+    await this.tripRepository.markCompleted(
+      tripId,
+    );
+
+    console.log(
+      "Trip marked as completed.",
+    );
 
     return updatedStop;
   }
+
+  if (
+    manifest.currentPhase ===
+    "dropoff"
+  ) {
+    const nextStop =
+      manifest.nextStop;
+
+    console.log(
+      "Publishing next_for_dropoff event:",
+      {
+        tripId,
+        learnerId:
+          nextStop.learnerId,
+        learnerName:
+          nextStop.learner.fullName,
+      },
+    );
+
+    await publishDomainEvent({
+      type:
+        "trip.state_changed",
+
+      tripId,
+
+      learnerId:
+        nextStop.learnerId,
+
+      eventType:
+        "next_for_dropoff",
+
+      previousStatus:
+        "on_board",
+
+      newStatus:
+        "next_for_dropoff",
+
+      occurredAt:
+        new Date().toISOString(),
+    });
+
+    console.log(
+      "next_for_dropoff event published.",
+    );
+  }
+
+  return updatedStop;
+}
 
   async getTripManifest(
     tripId: string,

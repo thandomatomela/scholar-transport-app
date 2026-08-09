@@ -30,10 +30,28 @@ export type DriverOnTheWayEvent = {
   occurredAt: string;
 };
 
+export type LearnerAbsentEvent = {
+  type: "learner.absent";
+  tripId: string;
+  stopId: string;
+  learnerId: string;
+  occurredAt: string;
+};
+
+export type LearnerNoShowEvent = {
+  type: "learner.no_show";
+  tripId: string;
+  stopId: string;
+  learnerId: string;
+  occurredAt: string;
+};
+
 export type DomainEvent =
   | TripStateChangedEvent
   | DriverArrivedEvent
-  | DriverOnTheWayEvent;
+  | DriverOnTheWayEvent
+  | LearnerAbsentEvent
+  | LearnerNoShowEvent;
 
 export type DomainEventHandler<
   T extends DomainEvent = DomainEvent,

@@ -35,22 +35,43 @@ type NextStopCardProps = {
 
 const DOORBELL_DISTANCE_METRES = 100;
 
+const ALLOW_DOORBELL_BYPASS =
+  process.env
+    .NEXT_PUBLIC_ALLOW_DOORBELL_BYPASS ===
+  "true";
+
 export function NextStopCard({
   manifest,
   actionLoading,
   onStopAction,
   onNotifyParent,
 }: NextStopCardProps) {
-  const stop = manifest.nextStop;
-  const nextAction = manifest.nextAction;
+  const stop =
+    manifest.nextStop;
 
-  const [driverLocation, setDriverLocation] =
-    useState<DriverLocation | null>(null);
+  const nextAction =
+    manifest.nextAction;
 
-  const [locationError, setLocationError] =
-    useState<string | null>(null);
+  const [
+    driverLocation,
+    setDriverLocation,
+  ] =
+    useState<DriverLocation | null>(
+      null,
+    );
 
-  const [doorbellSent, setDoorbellSent] =
+  const [
+    locationError,
+    setLocationError,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    doorbellSent,
+    setDoorbellSent,
+  ] =
     useState(false);
 
   useEffect(() => {
@@ -58,10 +79,22 @@ export function NextStopCard({
   }, [stop?.id]);
 
   useEffect(() => {
+    /*
+     * When the development bypass is enabled,
+     * geolocation is not required in order to
+     * test the doorbell.
+     *
+     * We still allow location tracking when
+     * available so the UI can display distance,
+     * but location errors will not prevent the
+     * button from being used.
+     */
     if (!navigator.geolocation) {
-      setLocationError(
-        "Location services are unavailable.",
-      );
+      if (!ALLOW_DOORBELL_BYPASS) {
+        setLocationError(
+          "Location services are unavailable.",
+        );
+      }
 
       return;
     }
@@ -78,7 +111,15 @@ export function NextStopCard({
 
           setLocationError(null);
         },
+
         (error) => {
+          if (
+            ALLOW_DOORBELL_BYPASS
+          ) {
+            setLocationError(null);
+            return;
+          }
+
           if (
             error.code ===
             error.PERMISSION_DENIED
@@ -94,6 +135,7 @@ export function NextStopCard({
             "Unable to determine your distance from this stop.",
           );
         },
+
         {
           enableHighAccuracy: true,
           maximumAge: 5_000,
@@ -108,33 +150,39 @@ export function NextStopCard({
     };
   }, []);
 
-  const distanceToStop = useMemo(() => {
-    if (
-      !stop ||
-      !driverLocation ||
-      stop.latitude === null ||
-      stop.longitude === null
-    ) {
-      return null;
-    }
+  const distanceToStop =
+    useMemo(() => {
+      if (
+        !stop ||
+        !driverLocation ||
+        stop.latitude === null ||
+        stop.longitude === null
+      ) {
+        return null;
+      }
 
-    return calculateDistanceInMetres(
-      driverLocation.latitude,
-      driverLocation.longitude,
-      stop.latitude,
-      stop.longitude,
-    );
-  }, [
-    driverLocation,
-    stop,
-  ]);
+      return calculateDistanceInMetres(
+        driverLocation.latitude,
+        driverLocation.longitude,
+        stop.latitude,
+        stop.longitude,
+      );
+    }, [
+      driverLocation,
+      stop,
+    ]);
 
-  if (!stop || !nextAction) {
+  if (
+    !stop ||
+    !nextAction
+  ) {
     return null;
   }
 
   const learnerName =
-    getLearnerName(stop);
+    getLearnerName(
+      stop,
+    );
 
   const followingLearnerName =
     getFollowingLearnerName(
@@ -156,17 +204,29 @@ export function NextStopCard({
     stop.latitude !== null &&
     stop.longitude !== null;
 
+  /*
+   * Production:
+   * Driver must be within 100 metres.
+   *
+   * Development/testing:
+   * NEXT_PUBLIC_ALLOW_DOORBELL_BYPASS=true
+   * overrides the geofence.
+   */
   const isWithinDoorbellRange =
-    distanceToStop !== null &&
-    distanceToStop <=
-      DOORBELL_DISTANCE_METRES;
+    ALLOW_DOORBELL_BYPASS ||
+    (
+      distanceToStop !== null &&
+      distanceToStop <=
+        DOORBELL_DISTANCE_METRES
+    );
 
   const doorbellDisabled =
     actionLoading ||
     doorbellSent ||
     !isWithinDoorbellRange;
 
-  async function handleDoorbell(): Promise<void> {
+  async function handleDoorbell():
+    Promise<void> {
     if (
       doorbellDisabled ||
       !stop
@@ -174,8 +234,13 @@ export function NextStopCard({
       return;
     }
 
-    await onNotifyParent(stop.id);
-    setDoorbellSent(true);
+    await onNotifyParent(
+      stop.id,
+    );
+
+    setDoorbellSent(
+      true,
+    );
   }
 
   return (
@@ -246,7 +311,9 @@ export function NextStopCard({
 
         <button
           type="button"
-          disabled={doorbellDisabled}
+          disabled={
+            doorbellDisabled
+          }
           onClick={() => {
             void handleDoorbell();
           }}
@@ -260,7 +327,9 @@ export function NextStopCard({
 
       <button
         type="button"
-        disabled={actionLoading}
+        disabled={
+          actionLoading
+        }
         onClick={() => {
           void onStopAction(
             stop.id,
@@ -280,7 +349,9 @@ export function NextStopCard({
         <div className="mt-3 grid grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={actionLoading}
+            disabled={
+              actionLoading
+            }
             onClick={() => {
               void onStopAction(
                 stop.id,
@@ -313,7 +384,9 @@ export function NextStopCard({
       </button>
 
       <p className="mt-3 text-center text-xs text-slate-400">
-        No Show and Undo are displayed as workflow reminders until their backend actions are added.
+        No Show and Undo are displayed
+        as workflow reminders until
+        their backend actions are added.
       </p>
     </section>
   );
@@ -321,9 +394,12 @@ export function NextStopCard({
 
 type DoorbellMessageOptions = {
   doorbellSent: boolean;
-  distanceToStop: number | null;
-  stopHasCoordinates: boolean;
-  locationError: string | null;
+  distanceToStop:
+    number | null;
+  stopHasCoordinates:
+    boolean;
+  locationError:
+    string | null;
 };
 
 function getDoorbellMessage({
@@ -333,45 +409,80 @@ function getDoorbellMessage({
   locationError,
 }: DoorbellMessageOptions): string {
   if (doorbellSent) {
-    return "The parent has been told that the driver is outside.";
+    return (
+      "The parent has been told " +
+      "that the driver is outside."
+    );
   }
 
-  if (!stopHasCoordinates) {
-    return "Add GPS coordinates to this stop to enable the doorbell.";
+  if (
+    ALLOW_DOORBELL_BYPASS
+  ) {
+    return (
+      "Doorbell test mode is enabled."
+    );
+  }
+
+  if (
+    !stopHasCoordinates
+  ) {
+    return (
+      "Add GPS coordinates to this " +
+      "stop to enable the doorbell."
+    );
   }
 
   if (locationError) {
     return locationError;
   }
 
-  if (distanceToStop === null) {
-    return "Checking your distance from the pickup address...";
+  if (
+    distanceToStop === null
+  ) {
+    return (
+      "Checking your distance from " +
+      "the pickup address..."
+    );
   }
 
   if (
     distanceToStop <=
     DOORBELL_DISTANCE_METRES
   ) {
-    return "You are close enough to notify the parent that you are outside.";
+    return (
+      "You are close enough to " +
+      "notify the parent that you " +
+      "are outside."
+    );
   }
 
-  return `The doorbell unlocks within ${DOORBELL_DISTANCE_METRES} metres of the stop.`;
+  return (
+    `The doorbell unlocks within ` +
+    `${DOORBELL_DISTANCE_METRES} ` +
+    `metres of the stop.`
+  );
 }
 
 function getFollowingLearnerName(
-  manifest: DriverTripManifest,
+  manifest:
+    DriverTripManifest,
   currentStopId: string,
   action: NonNullable<
-    DriverTripManifest["nextAction"]
+    DriverTripManifest[
+      "nextAction"
+    ]
   >,
 ): string {
   const currentIndex =
     manifest.learners.findIndex(
       (learner) =>
-        learner.id === currentStopId,
+        learner.id ===
+        currentStopId,
     );
 
-  if (currentIndex < 0) {
+  if (
+    currentIndex < 0
+  ) {
     return "No further learner";
   }
 
@@ -384,11 +495,13 @@ function getFollowingLearnerName(
     action === "pick-up"
       ? remainingLearners.find(
           (learner) =>
-            learner.status === "pending",
+            learner.status ===
+            "pending",
         )
       : remainingLearners.find(
           (learner) =>
-            learner.status === "picked_up",
+            learner.status ===
+            "picked_up",
         );
 
   if (followingStop) {
@@ -403,11 +516,13 @@ function getFollowingLearnerName(
 }
 
 function getLearnerName(
-  stop: DriverTripStop,
+  stop:
+    DriverTripStop,
 ): string {
   const compatibleStop =
     stop as DriverTripStop & {
       learner_name?: string;
+
       learner?: {
         fullName?: string;
         full_name?: string;
@@ -415,9 +530,12 @@ function getLearnerName(
     };
 
   return (
-    compatibleStop.learner_name ||
-    compatibleStop.learner?.fullName ||
-    compatibleStop.learner?.full_name ||
+    compatibleStop
+      .learner_name ||
+    compatibleStop
+      .learner?.fullName ||
+    compatibleStop
+      .learner?.full_name ||
     "Learner"
   );
 }
@@ -432,10 +550,14 @@ function calculateDistanceInMetres(
     6_371_000;
 
   const firstLatitudeRadians =
-    toRadians(firstLatitude);
+    toRadians(
+      firstLatitude,
+    );
 
   const secondLatitudeRadians =
-    toRadians(secondLatitude);
+    toRadians(
+      secondLatitude,
+    );
 
   const latitudeDifference =
     toRadians(
@@ -466,8 +588,12 @@ function calculateDistanceInMetres(
   const angularDistance =
     2 *
     Math.atan2(
-      Math.sqrt(haversine),
-      Math.sqrt(1 - haversine),
+      Math.sqrt(
+        haversine,
+      ),
+      Math.sqrt(
+        1 - haversine,
+      ),
     );
 
   return (
