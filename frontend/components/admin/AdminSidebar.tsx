@@ -12,6 +12,11 @@ const navigationItems = [
     icon: "▦",
   },
   {
+    label: "Applications",
+    href: "/admin/applications",
+    icon: "📝",
+  },
+  {
     label: "Learners",
     href: "/admin/learners",
     icon: "🎓",

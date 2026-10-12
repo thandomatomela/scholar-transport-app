@@ -1,12 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {
+  usePathname,
+} from "next/navigation";
 
 const navigationItems = [
   {
     label: "Dashboard",
     href: "/admin",
+  },
+  {
+    label: "Applications",
+    href: "/admin/applications",
   },
   {
     label: "Learners",
