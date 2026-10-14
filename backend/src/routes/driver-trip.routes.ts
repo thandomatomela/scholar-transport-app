@@ -9,6 +9,7 @@ import {
   getDriverTripManifest,
   initializeDriverDay,
   overrideAfternoonLearner,
+  notifyParentDriverOnTheWay,
   markLearnerAbsent,
   markLearnerNoShow,
   notifyParentDriverArrived,
@@ -40,6 +41,11 @@ driverTripRouter.post(
 driverTripRouter.post(
   "/me/start-afternoon-run",
   startAfternoonRun,
+);
+
+driverTripRouter.post(
+  "/trips/:tripId/stops/:stopId/on-my-way",
+  notifyParentDriverOnTheWay,
 );
 
 driverTripRouter.post(

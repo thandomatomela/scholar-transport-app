@@ -1,4 +1,6 @@
 import { publishDomainEvent } from "../events/event-bus.js";
+import { calculateDistanceMeters } from "../utils/distance.js";
+
 
 import {
   TripStopRepository,
@@ -189,205 +191,245 @@ export class DriverTripService {
     );
   }
 
-  async notifyParentDriverArrived(
-    tripId: string,
-    stopId: string,
-  ): Promise<void> {
-    await this.tripRepository.assertInProgress(tripId);
-    const stops =
-      await this.tripStopRepository.findByTripId(
-        tripId,
-      );
+  async notifyParentDriverOnTheWay(
+  tripId: string,
+  stopId: string,
+): Promise<void> {
+  await this.tripRepository.assertInProgress(
+    tripId,
+  );
 
-    const stop =
-      stops.find(
-        (candidate) =>
-          candidate.id ===
-          stopId,
-      );
-
-    if (!stop) {
-      throw new Error(
-        "Trip stop was not found.",
-      );
-    }
-
-    await publishDomainEvent({
-      type:
-        "driver.arrived",
-
+  const updatedStop =
+    await this.tripStopRepository.markEnRoute(
       tripId,
-
       stopId,
+    );
 
+  console.log(
+    "Learner marked as en route:",
+    {
+      tripId,
+      stopId:
+        updatedStop.id,
       learnerId:
-        stop.learnerId,
+        updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+      address:
+        updatedStop.address,
+    },
+  );
 
-      occurredAt:
-        new Date().toISOString(),
-    });
+  await publishDomainEvent({
+    type:
+      "driver.on_the_way",
+
+    tripId,
+
+    stopId:
+      updatedStop.id,
+
+    learnerId:
+      updatedStop.learnerId,
+
+    address:
+      updatedStop.address,
+
+    occurredAt:
+      new Date().toISOString(),
+  });
+
+  console.log(
+    "driver.on_the_way event published.",
+  );
+}
+
+ async notifyParentDriverArrived(
+  tripId: string,
+  stopId: string,
+  driverLatitude: number,
+  driverLongitude: number,
+): Promise<void> {
+  const ARRIVAL_RADIUS_METERS =
+    200;
+
+  await this.tripRepository.assertInProgress(
+    tripId,
+  );
+
+  const stops =
+    await this.tripStopRepository.findByTripId(
+      tripId,
+    );
+
+  const stop =
+    stops.find(
+      (candidate) =>
+        candidate.id ===
+        stopId,
+    );
+
+  if (!stop) {
+    throw new Error(
+      "Trip stop was not found.",
+    );
   }
 
+  if (
+    stop.latitude === null ||
+    stop.longitude === null
+  ) {
+    throw new Error(
+      "Learner pickup location is unavailable.",
+    );
+  }
+
+  if (
+    stop.status !==
+    "en_route"
+  ) {
+    throw new Error(
+      "Learner is not currently en route.",
+    );
+  }
+
+  const distanceMeters =
+    calculateDistanceMeters(
+      driverLatitude,
+      driverLongitude,
+      stop.latitude,
+      stop.longitude,
+    );
+
+  console.log(
+    "Driver arrival distance check:",
+    {
+      tripId,
+      stopId,
+      learnerId:
+        stop.learnerId,
+      distanceMeters:
+        Math.round(
+          distanceMeters,
+        ),
+      allowedRadiusMeters:
+        ARRIVAL_RADIUS_METERS,
+    },
+  );
+
+  if (
+    distanceMeters >
+    ARRIVAL_RADIUS_METERS
+  ) {
+    throw new Error(
+      `Driver is too far from the learner pickup location. Distance: ${Math.round(
+        distanceMeters,
+      )} metres.`,
+    );
+  }
+
+  const updatedStop =
+    await this.tripStopRepository.markArrived(
+      tripId,
+      stopId,
+    );
+
+  await publishDomainEvent({
+    type:
+      "driver.arrived",
+
+    tripId,
+
+    stopId:
+      updatedStop.id,
+
+    learnerId:
+      updatedStop.learnerId,
+
+    occurredAt:
+      new Date().toISOString(),
+  });
+
+  console.log(
+    "driver.arrived event published.",
+  );
+}
+
   async pickUpLearner(
-    tripId: string,
-    stopId: string,
-  ): Promise<DriverTripStop> {
-    await this.tripRepository.assertInProgress(tripId);
-    console.log(
-      "Starting learner pickup:",
-      {
-        tripId,
-        stopId,
-      },
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  await this.tripRepository.assertInProgress(tripId);
+
+  console.log(
+    "Starting learner pickup:",
+    {
+      tripId,
+      stopId,
+    },
+  );
+
+  const updatedStop =
+    await this.tripStopRepository.markPickedUp(
+      tripId,
+      stopId,
     );
 
-    const updatedStop =
-      await this.tripStopRepository.markPickedUp(
-        tripId,
-        stopId,
-      );
+  console.log(
+    "Learner marked as picked up:",
+    {
+      stopId:
+        updatedStop.id,
 
-    console.log(
-      "Learner marked as picked up:",
-      {
-        stopId:
-          updatedStop.id,
+      learnerId:
+        updatedStop.learnerId,
 
-        learnerId:
-          updatedStop.learnerId,
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
 
-        learnerName:
-          updatedStop.learner.fullName,
-      },
-    );
-
-    console.log(
-      "Publishing picked_up event:",
-      {
-        tripId,
-
-        learnerId:
-          updatedStop.learnerId,
-
-        learnerName:
-          updatedStop.learner.fullName,
-      },
-    );
-
-    await publishDomainEvent({
-      type:
-        "trip.state_changed",
-
+  console.log(
+    "Publishing picked_up event:",
+    {
       tripId,
 
       learnerId:
         updatedStop.learnerId,
 
-      eventType:
-        "picked_up",
+      learnerName:
+        updatedStop.learner.fullName,
+    },
+  );
 
-      previousStatus:
-        "waiting_for_pickup",
+  await publishDomainEvent({
+    type:
+      "trip.state_changed",
 
-      newStatus:
-        "on_board",
+    tripId,
 
-      occurredAt:
-        new Date().toISOString(),
-    });
+    learnerId:
+      updatedStop.learnerId,
 
-    console.log(
-      "picked_up event published.",
-    );
+    eventType:
+      "picked_up",
 
-    const manifest =
-      await this.getTripManifest(
-        tripId,
-      );
+    previousStatus:
+      "waiting_for_pickup",
 
-    console.log(
-      "Manifest after pickup:",
-      {
-        currentPhase:
-          manifest.currentPhase,
+    newStatus:
+      "on_board",
 
-        nextAction:
-          manifest.nextAction,
+    occurredAt:
+      new Date().toISOString(),
+  });
 
-        nextStopId:
-          manifest.nextStop?.id ??
-          null,
+  console.log(
+    "picked_up event published.",
+  );
 
-        nextLearnerId:
-          manifest.nextStop
-            ?.learnerId ??
-          null,
-
-        nextLearnerName:
-          manifest.nextStop
-            ?.learner.fullName ??
-          null,
-      },
-    );
-
-    const nextStop =
-      manifest.currentPhase ===
-      "pickup"
-        ? manifest.nextStop
-        : null;
-
-    if (!nextStop) {
-      console.log(
-        "No next pickup stop found. On-the-way notification not published.",
-      );
-
-      return updatedStop;
-    }
-
-    console.log(
-      "Publishing driver.on_the_way:",
-      {
-        tripId,
-
-        stopId:
-          nextStop.id,
-
-        learnerId:
-          nextStop.learnerId,
-
-        learnerName:
-          nextStop.learner.fullName,
-
-        address:
-          nextStop.address,
-      },
-    );
-
-    await publishDomainEvent({
-      type:
-        "driver.on_the_way",
-
-      tripId,
-
-      stopId:
-        nextStop.id,
-
-      learnerId:
-        nextStop.learnerId,
-
-      address:
-        nextStop.address,
-
-      occurredAt:
-        new Date().toISOString(),
-    });
-
-    console.log(
-      "driver.on_the_way event published.",
-    );
-
-    return updatedStop;
-  }
+  return updatedStop;
+}
 
   async markLearnerAbsent(
     tripId: string,
@@ -946,110 +988,150 @@ export class DriverTripService {
   }
 
   async getTripManifest(
-    tripId: string,
-  ): Promise<DriverTripManifest> {
-    const stops =
-      await this.tripStopRepository.findByTripId(
-        tripId,
-      );
-
-    const orderedStops =
-      [...stops].sort(
-        (
-          firstStop,
-          secondStop,
-        ) =>
-          firstStop.sequence -
-          secondStop.sequence,
-      );
-
-    const nextPendingStop =
-      orderedStops.find(
-        (stop) =>
-          stop.status ===
-          "pending",
-      );
-
-    const nextPickedUpStop =
-      orderedStops.find(
-        (stop) =>
-          stop.status ===
-          "picked_up",
-      );
-
-    let currentPhase:
-      DriverTripPhase;
-
-    let nextAction:
-      DriverTripNextAction;
-
-    let nextStop:
-      DriverTripStop | null;
-
-    if (
-      nextPendingStop
-    ) {
-      currentPhase =
-        "pickup";
-
-      nextAction =
-        "pick-up";
-
-      nextStop =
-        nextPendingStop;
-    } else if (
-      nextPickedUpStop
-    ) {
-      currentPhase =
-        "dropoff";
-
-      nextAction =
-        "drop-off";
-
-      nextStop =
-        nextPickedUpStop;
-    } else {
-      currentPhase =
-        "complete";
-
-      nextAction =
-        null;
-
-      nextStop =
-        null;
-    }
-
-    const completedCount =
-      orderedStops.filter(
-        (stop) =>
-          stop.status ===
-            "absent" ||
-          stop.status ===
-            "no_show" ||
-          stop.status ===
-            "dropped_off",
-      ).length;
-
-    return {
+  tripId: string,
+): Promise<DriverTripManifest> {
+  const stops =
+    await this.tripStopRepository.findByTripId(
       tripId,
+    );
 
-      currentPhase,
+  const orderedStops =
+    [...stops].sort(
+      (
+        firstStop,
+        secondStop,
+      ) =>
+        firstStop.sequence -
+        secondStop.sequence,
+    );
 
-      nextAction,
+  /*
+   * Pickup workflow states.
+   *
+   * Sequence is advisory only.
+   * The driver chooses which pending
+   * learner to visit next.
+   */
+  const activePickupStop =
+    orderedStops.find(
+      (stop) =>
+        stop.status ===
+          "en_route" ||
+        stop.status ===
+          "arrived",
+    );
 
-      nextStop,
+  const nextPendingStop =
+    orderedStops.find(
+      (stop) =>
+        stop.status ===
+        "pending",
+    );
 
-      learnerCount:
-        orderedStops.length,
+  const nextPickedUpStop =
+    orderedStops.find(
+      (stop) =>
+        stop.status ===
+        "picked_up",
+    );
 
+  let currentPhase:
+    DriverTripPhase;
+
+  let nextAction:
+    DriverTripNextAction;
+
+  let nextStop:
+    DriverTripStop | null;
+
+  /*
+   * An en-route or arrived learner
+   * takes precedence over another
+   * pending learner.
+   *
+   * This prevents the manifest from
+   * suggesting another learner while
+   * the driver is already handling one.
+   */
+  if (activePickupStop) {
+    currentPhase =
+      "pickup";
+
+    nextAction =
+      "pick-up";
+
+    nextStop =
+      activePickupStop;
+  } else if (
+    nextPendingStop
+  ) {
+    currentPhase =
+      "pickup";
+
+    nextAction =
+      "pick-up";
+
+    /*
+     * Advisory only.
+     *
+     * Android must not automatically
+     * act on this learner.
+     */
+    nextStop =
+      nextPendingStop;
+  } else if (
+    nextPickedUpStop
+  ) {
+    currentPhase =
+      "dropoff";
+
+    nextAction =
+      "drop-off";
+
+    nextStop =
+      nextPickedUpStop;
+  } else {
+    currentPhase =
+      "complete";
+
+    nextAction =
+      null;
+
+    nextStop =
+      null;
+  }
+
+  const completedCount =
+    orderedStops.filter(
+      (stop) =>
+        stop.status ===
+          "absent" ||
+        stop.status ===
+          "no_show" ||
+        stop.status ===
+          "dropped_off",
+    ).length;
+
+  return {
+    tripId,
+
+    currentPhase,
+
+    nextAction,
+
+    nextStop,
+
+    learnerCount:
+      orderedStops.length,
+
+    completedCount,
+
+    remainingCount:
+      orderedStops.length -
       completedCount,
 
-      remainingCount:
-        orderedStops.length -
-        completedCount,
-
-      learners:
-        orderedStops,
-    };
-  }
+    learners:
+      orderedStops,
+  };
+}
 }

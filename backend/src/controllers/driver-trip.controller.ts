@@ -9,6 +9,7 @@ import { TripStopRepository } from "../repositories/trip-stop.repository.js";
 import { TripRepository } from "../repositories/trip.repository.js";
 import { DriverTripService } from "../services/driver-trip.service.js";
 
+
 const TEST_DRIVER_ID =
   "84ce3bda-45e7-458a-bead-9fdaf75f0828";
 
@@ -352,11 +353,11 @@ export async function pickUpLearner(
       );
 
     const statusCode =
-      message.includes(
-        "not found or is no longer pending",
-      )
-        ? 409
-        : 500;
+  message.includes(
+    "not found or the driver has not completed the arrival workflow",
+  )
+    ? 409
+    : 500;
 
     response
       .status(
@@ -503,6 +504,87 @@ export async function markLearnerNoShow(
   }
 }
 
+export async function notifyParentDriverOnTheWay(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const tripId =
+      getRouteParameter(
+        request.params
+          .tripId,
+      );
+
+    const stopId =
+      getRouteParameter(
+        request.params
+          .stopId,
+      );
+
+    if (
+      !tripId ||
+      !stopId
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "Trip ID and stop ID are required.",
+        });
+
+      return;
+    }
+
+    await driverTripService.notifyParentDriverOnTheWay(
+      tripId,
+      stopId,
+    );
+
+    response
+      .status(200)
+      .json({
+        data: {
+          tripId,
+          stopId,
+          notification:
+            "Parent on-the-way notification requested.",
+        },
+      });
+  } catch (error) {
+    const message =
+      getErrorMessage(
+        error,
+      );
+
+    const statusCode =
+      message.includes(
+        "Trip stop was not found",
+      )
+        ? 404
+        : message.includes(
+  "Another learner is already en route",
+) ||
+message.includes(
+  "Only a pending learner",
+) ||
+message.includes(
+  "not currently in progress",
+)
+        ? 409
+        : 500;
+
+    response
+      .status(
+        statusCode,
+      )
+      .json({
+        error:
+          message,
+      });
+  }
+}
+
+// Ring the Bell requires driver GPS coordinates.
 export async function notifyParentDriverArrived(
   request: Request,
   response: Response,
@@ -534,9 +616,55 @@ export async function notifyParentDriverArrived(
       return;
     }
 
+    const latitude =
+      request.body?.latitude;
+
+    const longitude =
+      request.body?.longitude;
+
+    if (
+      typeof latitude !==
+        "number" ||
+      !Number.isFinite(
+        latitude,
+      ) ||
+      latitude < -90 ||
+      latitude > 90
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "A valid latitude is required.",
+        });
+
+      return;
+    }
+
+    if (
+      typeof longitude !==
+        "number" ||
+      !Number.isFinite(
+        longitude,
+      ) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      response
+        .status(400)
+        .json({
+          error:
+            "A valid longitude is required.",
+        });
+
+      return;
+    }
+
     await driverTripService.notifyParentDriverArrived(
       tripId,
       stopId,
+      latitude,
+      longitude,
     );
 
     response
@@ -560,7 +688,17 @@ export async function notifyParentDriverArrived(
         "Trip stop was not found",
       )
         ? 404
-        : 500;
+        : message.includes(
+              "not currently",
+            ) ||
+            message.includes(
+              "too far",
+            ) ||
+            message.includes(
+              "location is unavailable",
+            )
+          ? 409
+          : 500;
 
     response
       .status(

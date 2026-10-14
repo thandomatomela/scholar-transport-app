@@ -2,6 +2,8 @@ import { supabase } from "../config/supabase.js";
 
 export type TripStopStatus =
   | "pending"
+  | "en_route"
+  | "arrived"
   | "picked_up"
   | "absent"
   | "no_show"
@@ -274,6 +276,122 @@ export class TripStopRepository {
     );
   }
 
+  async markEnRoute(
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  const now =
+    new Date().toISOString();
+
+  const {
+    data: stop,
+    error,
+  } =
+    await supabase
+      .from("trip_stops")
+      .update({
+        status:
+          "en_route",
+
+        updated_at:
+          now,
+      })
+      .eq(
+        "id",
+        stopId,
+      )
+      .eq(
+        "trip_id",
+        tripId,
+      )
+      .eq(
+        "status",
+        "pending",
+      )
+      .select(
+        TRIP_STOP_SELECT,
+      )
+      .maybeSingle();
+
+  if (error) {
+  if (
+    error.code === "23505"
+  ) {
+    throw new Error(
+      "Another learner is already en route for this trip.",
+    );
+  }
+
+  throw new Error(
+    `Failed to mark learner as en route: ${error.message}`,
+  );
+}
+
+  if (!stop) {
+    throw new Error(
+      "Trip stop was not found or is no longer pending.",
+    );
+  }
+
+  return this.attachLearner(
+    stop,
+  );
+}
+
+async markArrived(
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  const now =
+    new Date().toISOString();
+
+  const {
+    data: stop,
+    error,
+  } =
+    await supabase
+      .from("trip_stops")
+      .update({
+        status:
+          "arrived",
+
+        updated_at:
+          now,
+      })
+      .eq(
+        "id",
+        stopId,
+      )
+      .eq(
+        "trip_id",
+        tripId,
+      )
+      .eq(
+        "status",
+        "en_route",
+      )
+      .select(
+        TRIP_STOP_SELECT,
+      )
+      .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Failed to mark learner as arrived: ${error.message}`,
+    );
+  }
+
+  if (!stop) {
+    throw new Error(
+      "Trip stop was not found or the learner is not currently en route.",
+    );
+  }
+
+  return this.attachLearner(
+    stop,
+  );
+}
+
   async markPickedUp(
     tripId: string,
     stopId: string,
@@ -310,7 +428,7 @@ export class TripStopRepository {
         )
         .eq(
           "status",
-          "pending",
+          "arrived",
         )
         .select(
           TRIP_STOP_SELECT,
@@ -324,10 +442,10 @@ export class TripStopRepository {
     }
 
     if (!stop) {
-      throw new Error(
-        "Trip stop was not found or is no longer pending.",
-      );
-    }
+  throw new Error(
+    "Trip stop was not found or the driver has not completed the arrival workflow.",
+  );
+}
 
     return this.attachLearner(
       stop,
@@ -492,7 +610,7 @@ export class TripStopRepository {
         )
         .eq(
           "status",
-          "pending",
+          "arrived",
         )
         .select(
           TRIP_STOP_SELECT,
@@ -506,10 +624,10 @@ export class TripStopRepository {
     }
 
     if (!stop) {
-      throw new Error(
-        "Trip stop was not found or is no longer pending.",
-      );
-    }
+  throw new Error(
+    "Trip stop was not found or the driver has not arrived at the pickup location.",
+  );
+}
 
     return this.attachLearner(
       stop,
@@ -517,202 +635,250 @@ export class TripStopRepository {
   }
 
   async undoStopAction(
-    tripId: string,
-    stopId: string,
-  ): Promise<DriverTripStop> {
-    const stops =
-      await this.findByTripId(
-        tripId,
-      );
+  tripId: string,
+  stopId: string,
+): Promise<DriverTripStop> {
+  const stops =
+    await this.findByTripId(
+      tripId,
+    );
 
-    const stop =
-      stops.find(
-        (candidate) =>
-          candidate.id ===
-          stopId,
-      );
+  const stop =
+    stops.find(
+      (candidate) =>
+        candidate.id ===
+        stopId,
+    );
 
-    if (!stop) {
-      throw new Error(
-        "Trip stop was not found.",
-      );
-    }
-
-    if (
-      stop.status ===
-      "pending"
-    ) {
-      throw new Error(
-        "There is no action to undo for this stop.",
-      );
-    }
-
-    const now =
-      new Date().toISOString();
-
-    let nextStatus:
-      TripStopStatus;
-
-    let updates: {
-      status: TripStopStatus;
-      picked_up_at?: string | null;
-      dropped_off_at?: string | null;
-      marked_absent_at?: string | null;
-      updated_at: string;
-    };
-
-    switch (stop.status) {
-      case "picked_up": {
-        nextStatus =
-          "pending";
-
-        updates = {
-          status:
-            nextStatus,
-
-          picked_up_at:
-            null,
-
-          dropped_off_at:
-            null,
-
-          marked_absent_at:
-            null,
-
-          updated_at:
-            now,
-        };
-
-        break;
-      }
-
-      case "absent": {
-        nextStatus =
-          "pending";
-
-        updates = {
-          status:
-            nextStatus,
-
-          marked_absent_at:
-            null,
-
-          picked_up_at:
-            null,
-
-          dropped_off_at:
-            null,
-
-          updated_at:
-            now,
-        };
-
-        break;
-      }
-
-      case "no_show": {
-        nextStatus =
-          "pending";
-
-        updates = {
-          status:
-            nextStatus,
-
-          marked_absent_at:
-            null,
-
-          picked_up_at:
-            null,
-
-          dropped_off_at:
-            null,
-
-          updated_at:
-            now,
-        };
-
-        break;
-      }
-
-      case "dropped_off": {
-        nextStatus =
-          "picked_up";
-
-        updates = {
-          status:
-            nextStatus,
-
-          /*
-           * Keep picked_up_at because
-           * the learner is back on board.
-           */
-          dropped_off_at:
-            null,
-
-          marked_absent_at:
-            null,
-
-          updated_at:
-            now,
-        };
-
-        break;
-      }
-
-      default: {
-        throw new Error(
-          `Cannot undo stop status ${stop.status}.`,
-        );
-      }
-    }
-
-    const {
-      data: updatedStop,
-      error,
-    } =
-      await supabase
-        .from("trip_stops")
-        .update(
-          updates,
-        )
-        .eq(
-          "id",
-          stopId,
-        )
-        .eq(
-          "trip_id",
-          tripId,
-        )
-        /*
-         * Important concurrency guard:
-         * only undo if the status is still
-         * what we just inspected.
-         */
-        .eq(
-          "status",
-          stop.status,
-        )
-        .select(
-          TRIP_STOP_SELECT,
-        )
-        .maybeSingle();
-
-    if (error) {
-      throw new Error(
-        `Failed to undo trip stop action: ${error.message}`,
-      );
-    }
-
-    if (!updatedStop) {
-      throw new Error(
-        "The trip stop changed before the undo could be completed.",
-      );
-    }
-
-    return this.attachLearner(
-      updatedStop,
+  if (!stop) {
+    throw new Error(
+      "Trip stop was not found.",
     );
   }
+
+  if (
+    stop.status ===
+    "pending"
+  ) {
+    throw new Error(
+      "There is no action to undo for this stop.",
+    );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  let nextStatus:
+    TripStopStatus;
+
+  let updates: {
+    status: TripStopStatus;
+    picked_up_at?: string | null;
+    dropped_off_at?: string | null;
+    marked_absent_at?: string | null;
+    updated_at: string;
+  };
+
+  switch (stop.status) {
+    case "en_route": {
+      nextStatus =
+        "pending";
+
+      updates = {
+        status:
+          nextStatus,
+
+        picked_up_at:
+          null,
+
+        dropped_off_at:
+          null,
+
+        marked_absent_at:
+          null,
+
+        updated_at:
+          now,
+      };
+
+      break;
+    }
+
+    case "arrived": {
+      nextStatus =
+        "en_route";
+
+      updates = {
+        status:
+          nextStatus,
+
+        picked_up_at:
+          null,
+
+        dropped_off_at:
+          null,
+
+        marked_absent_at:
+          null,
+
+        updated_at:
+          now,
+      };
+
+      break;
+    }
+
+    case "picked_up": {
+      nextStatus =
+        "arrived";
+
+      updates = {
+        status:
+          nextStatus,
+
+        picked_up_at:
+          null,
+
+        dropped_off_at:
+          null,
+
+        marked_absent_at:
+          null,
+
+        updated_at:
+          now,
+      };
+
+      break;
+    }
+
+    case "absent": {
+      nextStatus =
+        "pending";
+
+      updates = {
+        status:
+          nextStatus,
+
+        marked_absent_at:
+          null,
+
+        picked_up_at:
+          null,
+
+        dropped_off_at:
+          null,
+
+        updated_at:
+          now,
+      };
+
+      break;
+    }
+
+    case "no_show": {
+      nextStatus =
+        "arrived";
+
+      updates = {
+        status:
+          nextStatus,
+
+        marked_absent_at:
+          null,
+
+        picked_up_at:
+          null,
+
+        dropped_off_at:
+          null,
+
+        updated_at:
+          now,
+      };
+
+      break;
+    }
+
+    case "dropped_off": {
+      nextStatus =
+        "picked_up";
+
+      updates = {
+        status:
+          nextStatus,
+
+        /*
+         * Keep picked_up_at because
+         * the learner is back on board.
+         */
+        dropped_off_at:
+          null,
+
+        marked_absent_at:
+          null,
+
+        updated_at:
+          now,
+      };
+
+      break;
+    }
+
+    default: {
+      throw new Error(
+        `Cannot undo stop status ${stop.status}.`,
+      );
+    }
+  }
+
+  const {
+    data: updatedStop,
+    error,
+  } =
+    await supabase
+      .from("trip_stops")
+      .update(
+        updates,
+      )
+      .eq(
+        "id",
+        stopId,
+      )
+      .eq(
+        "trip_id",
+        tripId,
+      )
+      /*
+       * Concurrency guard:
+       * only undo if the status is still
+       * what we just inspected.
+       */
+      .eq(
+        "status",
+        stop.status,
+      )
+      .select(
+        TRIP_STOP_SELECT,
+      )
+      .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Failed to undo trip stop action: ${error.message}`,
+    );
+  }
+
+  if (!updatedStop) {
+    throw new Error(
+      "The trip stop changed before the undo could be completed.",
+    );
+  }
+
+  return this.attachLearner(
+    updatedStop,
+  );
+}
 
   private async attachLearner(
     stop:
