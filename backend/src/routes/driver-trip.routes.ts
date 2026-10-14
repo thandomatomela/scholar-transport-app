@@ -7,6 +7,8 @@ import {
   getCurrentDriverTrip,
   getDriverDashboard,
   getDriverTripManifest,
+  initializeDriverDay,
+  overrideAfternoonLearner,
   markLearnerAbsent,
   markLearnerNoShow,
   notifyParentDriverArrived,
@@ -23,6 +25,11 @@ export const driverTripRouter =
 driverTripRouter.get(
   "/me/dashboard",
   getDriverDashboard,
+);
+
+driverTripRouter.post(
+  "/me/initialize-day",
+  initializeDriverDay,
 );
 
 driverTripRouter.post(
@@ -73,6 +80,11 @@ driverTripRouter.post(
 driverTripRouter.post(
   "/trips/:tripId/stops/:stopId/drop-off",
   dropOffLearner,
+);
+
+driverTripRouter.post(
+  "/trips/:tripId/learners/:learnerId/override-afternoon",
+  overrideAfternoonLearner,
 );
 
 driverTripRouter.post(

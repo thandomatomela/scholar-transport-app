@@ -705,3 +705,39 @@ export async function undoLastDriverAction(
       });
   }
 }
+export async function initializeDriverDay(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const { DailyRunService } = await import("../services/daily-run.service.js");
+    const dailyRunService = new DailyRunService(tripStopRepository, tripRepository);
+    const serviceDate = typeof request.body?.serviceDate === "string"
+      ? request.body.serviceDate
+      : new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date());
+    const data = await dailyRunService.initializeDay(TEST_DRIVER_ID, serviceDate);
+    response.status(200).json({ data });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    response.status(getConflictStatusCode(message)).json({ error: message });
+  }
+}
+
+export async function overrideAfternoonLearner(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const tripId = getRouteParameter(request.params.tripId);
+    const learnerId = getRouteParameter(request.params.learnerId);
+    if (!tripId || !learnerId) {
+      response.status(400).json({ error: "Trip ID and learner ID are required." });
+      return;
+    }
+    await driverTripService.overrideAfternoonLearner(tripId, learnerId);
+    response.status(200).json({ data: { tripId, learnerId, afternoonStatus: "pending" } });
+  } catch (error) {
+    const message = getErrorMessage(error);
+    response.status(getConflictStatusCode(message)).json({ error: message });
+  }
+}

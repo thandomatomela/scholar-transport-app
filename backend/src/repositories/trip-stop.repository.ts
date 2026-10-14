@@ -91,6 +91,54 @@ export class TripStopRepository {
     }
   }
 
+  async createStopsFromTemplate(
+    tripId: string,
+    templateStops: DriverTripStop[],
+  ): Promise<void> {
+    if (templateStops.length === 0) return;
+
+    const rows = templateStops.map((stop) => ({
+      trip_id: tripId,
+      learner_id: stop.learnerId,
+      sequence: stop.sequence,
+      status: "pending" as TripStopStatus,
+      address: stop.address,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      picked_up_at: null,
+      dropped_off_at: null,
+      marked_absent_at: null,
+    }));
+
+    const { error } = await supabase.from("trip_stops").insert(rows);
+    if (error) {
+      throw new Error(`Failed to create daily trip stops: ${error.message}`);
+    }
+  }
+
+  async setLearnerStatusForTrip(
+    tripId: string,
+    learnerId: string,
+    status: "pending" | "absent" | "no_show",
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("trip_stops")
+      .update({
+        status,
+        picked_up_at: null,
+        dropped_off_at: null,
+        marked_absent_at: status === "pending" ? null : now,
+        updated_at: now,
+      })
+      .eq("trip_id", tripId)
+      .eq("learner_id", learnerId);
+
+    if (error) {
+      throw new Error(`Failed to update paired-run learner status: ${error.message}`);
+    }
+  }
+
   async findByTripId(
     tripId: string,
   ): Promise<DriverTripStop[]> {

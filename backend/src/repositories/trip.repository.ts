@@ -20,6 +20,7 @@ export type DriverTrip = {
   actualStart: string | null;
   actualEnd: string | null;
   status: DriverTripStatus;
+  serviceDate: string | null;
 };
 
 type TripRow = {
@@ -30,6 +31,7 @@ type TripRow = {
   actual_start: string | null;
   actual_end: string | null;
   status: DriverTripStatus;
+  service_date: string | null;
 };
 
 const TRIP_SELECT = `
@@ -39,7 +41,8 @@ const TRIP_SELECT = `
   scheduled_start,
   actual_start,
   actual_end,
-  status
+  status,
+  service_date
 `;
 
 export class TripRepository {
@@ -419,6 +422,80 @@ export class TripRepository {
       : null;
   }
 
+  async findById(tripId: string): Promise<DriverTrip | null> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .select(TRIP_SELECT)
+      .eq("id", tripId)
+      .maybeSingle<TripRow>();
+    if (error) throw new Error(`Failed to find trip: ${error.message}`);
+    return data ? this.toDomain(data) : null;
+  }
+
+  async findDailyTripForDriver(
+    driverId: string,
+    serviceDate: string,
+    direction: DriverTripDirection,
+  ): Promise<DriverTrip | null> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .select(TRIP_SELECT)
+      .eq("driver_id", driverId)
+      .eq("service_date", serviceDate)
+      .eq("direction", direction)
+      .maybeSingle<TripRow>();
+
+    if (error) {
+      throw new Error(`Failed to find daily trip: ${error.message}`);
+    }
+
+    return data ? this.toDomain(data) : null;
+  }
+
+  async createDailyTrip(
+    driverId: string,
+    serviceDate: string,
+    direction: DriverTripDirection,
+    scheduledStart: string,
+  ): Promise<DriverTrip> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .insert({
+        learner_id: null,
+        driver_id: driverId,
+        service_date: serviceDate,
+        direction,
+        scheduled_start: scheduledStart,
+        status: "scheduled",
+        actual_start: null,
+        actual_end: null,
+      })
+      .select(TRIP_SELECT)
+      .single<TripRow>();
+
+    if (error) {
+      throw new Error(`Failed to create daily trip: ${error.message}`);
+    }
+
+    return this.toDomain(data);
+  }
+
+  async assertInProgress(tripId: string): Promise<void> {
+    const { data, error } = await this.supabase
+      .from("trips")
+      .select("id")
+      .eq("id", tripId)
+      .eq("status", "in_progress")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to validate trip status: ${error.message}`);
+    }
+    if (!data) {
+      throw new Error("Trip is not currently in progress.");
+    }
+  }
+
   async findCurrentTripForDriver(
     driverId: string,
   ): Promise<DriverTrip | null> {
@@ -460,6 +537,9 @@ export class TripRepository {
 
       status:
         row.status,
+
+      serviceDate:
+        row.service_date,
     };
   }
 }

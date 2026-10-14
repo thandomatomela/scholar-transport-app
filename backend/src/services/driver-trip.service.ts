@@ -193,6 +193,7 @@ export class DriverTripService {
     tripId: string,
     stopId: string,
   ): Promise<void> {
+    await this.tripRepository.assertInProgress(tripId);
     const stops =
       await this.tripStopRepository.findByTripId(
         tripId,
@@ -231,6 +232,7 @@ export class DriverTripService {
     tripId: string,
     stopId: string,
   ): Promise<DriverTripStop> {
+    await this.tripRepository.assertInProgress(tripId);
     console.log(
       "Starting learner pickup:",
       {
@@ -391,6 +393,7 @@ export class DriverTripService {
     tripId: string,
     stopId: string,
   ): Promise<DriverTripStop> {
+    await this.tripRepository.assertInProgress(tripId);
     console.log(
       "Starting learner absence:",
       {
@@ -417,6 +420,12 @@ export class DriverTripService {
         learnerName:
           updatedStop.learner.fullName,
       },
+    );
+
+    await this.propagateMorningExclusion(
+      tripId,
+      updatedStop.learnerId,
+      "absent",
     );
 
     await publishDomainEvent({
@@ -446,6 +455,7 @@ export class DriverTripService {
     tripId: string,
     stopId: string,
   ): Promise<DriverTripStop> {
+    await this.tripRepository.assertInProgress(tripId);
     console.log(
       "Starting learner no-show:",
       {
@@ -472,6 +482,12 @@ export class DriverTripService {
         learnerName:
           updatedStop.learner.fullName,
       },
+    );
+
+    await this.propagateMorningExclusion(
+      tripId,
+      updatedStop.learnerId,
+      "no_show",
     );
 
     await publishDomainEvent({
@@ -501,6 +517,7 @@ export class DriverTripService {
     tripId: string,
     stopId: string,
   ): Promise<DriverTripStop> {
+    await this.tripRepository.assertInProgress(tripId);
     console.log(
       "Starting learner drop-off:",
       {
@@ -662,6 +679,39 @@ export class DriverTripService {
     }
 
     return updatedStop;
+  }
+
+  async overrideAfternoonLearner(
+    morningTripId: string,
+    learnerId: string,
+  ): Promise<void> {
+    const morningTrip = await this.tripRepository.findById(morningTripId);
+    if (!morningTrip || morningTrip.direction !== "home_to_school" || !morningTrip.driverId || !morningTrip.serviceDate) {
+      throw new Error("A valid morning trip is required for the afternoon override.");
+    }
+    const afternoonTrip = await this.tripRepository.findDailyTripForDriver(
+      morningTrip.driverId,
+      morningTrip.serviceDate,
+      "school_to_home",
+    );
+    if (!afternoonTrip) throw new Error("Afternoon trip was not found for this service date.");
+    await this.tripStopRepository.setLearnerStatusForTrip(afternoonTrip.id, learnerId, "pending");
+  }
+
+  private async propagateMorningExclusion(
+    tripId: string,
+    learnerId: string,
+    status: "absent" | "no_show",
+  ): Promise<void> {
+    const morningTrip = await this.tripRepository.findById(tripId);
+    if (!morningTrip || morningTrip.direction !== "home_to_school" || !morningTrip.driverId || !morningTrip.serviceDate) return;
+    const afternoonTrip = await this.tripRepository.findDailyTripForDriver(
+      morningTrip.driverId,
+      morningTrip.serviceDate,
+      "school_to_home",
+    );
+    if (!afternoonTrip) return;
+    await this.tripStopRepository.setLearnerStatusForTrip(afternoonTrip.id, learnerId, status);
   }
 
   async undoLastAction(
