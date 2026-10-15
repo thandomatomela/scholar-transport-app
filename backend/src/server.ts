@@ -1,5 +1,7 @@
 import "dotenv/config";
 
+import { sendWhatsAppMessage } from "./services/whatsapp.service.js";
+
 import cors from "cors";
 
 import express, {
@@ -152,6 +154,38 @@ const port =
     process.env.PORT,
   ) ||
   3001;
+
+  app.post("/api/test-whatsapp", async (req, res) => {
+  try {
+    const { to } = req.body;
+
+    if (!to) {
+      return res.status(400).json({
+        error: "Phone number is required",
+      });
+    }
+
+    const result = await sendWhatsAppMessage(
+      to,
+      "Hello 👋 This is a test message from Via Nova Scholar Transport.",
+    );
+
+    return res.json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    console.error("WhatsApp test failed:", error);
+
+    return res.status(500).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error",
+    });
+  }
+});
 
 app.listen(
   port,
