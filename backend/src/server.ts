@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import cors from "cors";
+import whatsappRoutes from "./routes/whatsapp.routes.js";
 
 import express, {
   type Request,
@@ -38,6 +39,11 @@ app.use(
 
 app.use(
   express.json(),
+);
+
+app.use(
+  "/api/whatsapp",
+  whatsappRoutes,
 );
 
 app.use(
