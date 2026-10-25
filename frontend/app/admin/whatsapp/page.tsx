@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FormEvent,
   useEffect,
   useState,
 } from "react";
@@ -36,14 +37,33 @@ type Conversation = {
 type Message = {
   id: string;
   provider_message_id: string | null;
-  direction: "inbound" | "outbound";
+
+  direction:
+    | "inbound"
+    | "outbound";
+
   message_type: string;
+
   body: string | null;
+
   status: string | null;
-  whatsapp_timestamp: string | null;
-  sent_by_user_id: string | null;
-  sent_by_name: string | null;
-  sent_by_role: string | null;
+
+  whatsapp_timestamp:
+    | string
+    | null;
+
+  sent_by_user_id:
+    | string
+    | null;
+
+  sent_by_name:
+    | string
+    | null;
+
+  sent_by_role:
+    | string
+    | null;
+
   created_at: string;
 };
 
@@ -106,6 +126,11 @@ export default function WhatsAppInboxPage() {
   >([]);
 
   const [
+    replyText,
+    setReplyText,
+  ] = useState("");
+
+  const [
     loading,
     setLoading,
   ] = useState(true);
@@ -113,6 +138,11 @@ export default function WhatsAppInboxPage() {
   const [
     loadingMessages,
     setLoadingMessages,
+  ] = useState(false);
+
+  const [
+    sending,
+    setSending,
   ] = useState(false);
 
   const [
@@ -147,6 +177,14 @@ export default function WhatsAppInboxPage() {
     }
 
     return data.session.access_token;
+  }
+
+  async function handleUnauthorized() {
+    await supabase.auth.signOut();
+
+    router.replace(
+      "/admin/login",
+    );
   }
 
   async function initialisePage() {
@@ -184,10 +222,7 @@ export default function WhatsAppInboxPage() {
         (await getAccessToken());
 
       if (!token) {
-        router.replace(
-          "/admin/login",
-        );
-
+        await handleUnauthorized();
         return;
       }
 
@@ -209,12 +244,7 @@ export default function WhatsAppInboxPage() {
         response.status ===
         401
       ) {
-        await supabase.auth.signOut();
-
-        router.replace(
-          "/admin/login",
-        );
-
+        await handleUnauthorized();
         return;
       }
 
@@ -283,10 +313,7 @@ export default function WhatsAppInboxPage() {
         (await getAccessToken());
 
       if (!token) {
-        router.replace(
-          "/admin/login",
-        );
-
+        await handleUnauthorized();
         return;
       }
 
@@ -308,12 +335,7 @@ export default function WhatsAppInboxPage() {
         response.status ===
         401
       ) {
-        await supabase.auth.signOut();
-
-        router.replace(
-          "/admin/login",
-        );
-
+        await handleUnauthorized();
         return;
       }
 
@@ -367,9 +389,130 @@ export default function WhatsAppInboxPage() {
       conversationId,
     );
 
+    setReplyText("");
+
     await loadMessages(
       conversationId,
     );
+  }
+
+  async function sendReply(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (
+      !selectedId ||
+      !replyText.trim() ||
+      sending
+    ) {
+      return;
+    }
+
+    try {
+      setSending(true);
+      setError(null);
+
+      const token =
+        await getAccessToken();
+
+      if (!token) {
+        await handleUnauthorized();
+        return;
+      }
+
+      const messageBody =
+        replyText.trim();
+
+      const response =
+        await fetch(
+          `/api/whatsapp/conversations/${selectedId}/messages`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body: JSON.stringify({
+              body: messageBody,
+            }),
+          },
+        );
+
+      if (
+        response.status ===
+        401
+      ) {
+        await handleUnauthorized();
+        return;
+      }
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ??
+            "Failed to send message",
+        );
+      }
+
+      const savedMessage:
+        Message | undefined =
+        data.message;
+
+      if (savedMessage) {
+        setMessages(
+          (current) => [
+            ...current,
+            savedMessage,
+          ],
+        );
+      } else {
+        await loadMessages(
+          selectedId,
+          token,
+        );
+      }
+
+      setConversations(
+        (current) =>
+          current.map(
+            (conversation) =>
+              conversation.id ===
+              selectedId
+                ? {
+                    ...conversation,
+
+                    last_message_preview:
+                      messageBody,
+
+                    last_message_at:
+                      new Date()
+                        .toISOString(),
+                  }
+                : conversation,
+          ),
+      );
+
+      setReplyText("");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to send message",
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   async function handleLogout() {
@@ -417,7 +560,9 @@ export default function WhatsAppInboxPage() {
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">
-            Parent and guardian conversations received through Via Nova.
+            Parent and guardian
+            conversations received
+            through Via Nova.
           </p>
         </div>
 
@@ -426,7 +571,7 @@ export default function WhatsAppInboxPage() {
           onClick={() =>
             void handleLogout()
           }
-          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
         >
           Sign out
         </button>
@@ -561,7 +706,8 @@ export default function WhatsAppInboxPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Parent messages will appear here.
+                  Parent messages
+                  will appear here.
                 </p>
               </div>
             </div>
@@ -643,6 +789,15 @@ export default function WhatsAppInboxPage() {
                                   message.created_at,
                               )}
                             </p>
+
+                            {outbound &&
+                              message.status && (
+                                <p className="mt-1 text-[10px] opacity-60">
+                                  {
+                                    message.status
+                                  }
+                                </p>
+                              )}
                           </div>
                         </div>
                       );
@@ -651,24 +806,53 @@ export default function WhatsAppInboxPage() {
                 )}
               </div>
 
-              <div className="border-t border-slate-200 bg-white p-4">
+              <form
+                onSubmit={
+                  sendReply
+                }
+                className="border-t border-slate-200 bg-white p-4"
+              >
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    disabled
-                    placeholder="Reply messaging will be enabled next..."
-                    className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+                    value={
+                      replyText
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setReplyText(
+                        event.target.value,
+                      )
+                    }
+                    disabled={
+                      sending
+                    }
+                    placeholder="Type a message..."
+                    className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-500 disabled:bg-slate-50"
                   />
 
                   <button
-                    type="button"
-                    disabled
-                    className="rounded-2xl bg-slate-300 px-5 py-3 text-sm font-bold text-white"
+                    type="submit"
+                    disabled={
+                      sending ||
+                      !replyText.trim()
+                    }
+                    className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
                   >
-                    Send
+                    {sending
+                      ? "Sending..."
+                      : "Send"}
                   </button>
                 </div>
-              </div>
+
+                <p className="mt-2 text-xs text-slate-400">
+                  Messages are sent
+                  through the Via Nova
+                  WhatsApp Business
+                  number.
+                </p>
+              </form>
             </>
           )}
         </section>
