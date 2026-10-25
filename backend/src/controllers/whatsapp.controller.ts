@@ -1,10 +1,17 @@
 import type { Request, Response } from "express";
+
 import { whatsappConfig } from "../config/whatsapp.config.js";
-import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
+
 import {
+  getWhatsAppConversationMessages,
+  getWhatsAppConversations,
+  markWhatsAppConversationRead,
   saveIncomingWhatsAppMessage,
 } from "../repositories/whatsapp.repository.js";
 
+import {
+  sendWhatsAppMessage,
+} from "../services/whatsapp.service.js";
 
 export async function sendTestWhatsAppMessage(
   request: Request,
@@ -18,6 +25,7 @@ export async function sendTestWhatsAppMessage(
         success: false,
         error: "Phone number is required",
       });
+
       return;
     }
 
@@ -31,7 +39,10 @@ export async function sendTestWhatsAppMessage(
       result,
     });
   } catch (error) {
-    console.error("WhatsApp test failed:", error);
+    console.error(
+      "WhatsApp test failed:",
+      error,
+    );
 
     response.status(500).json({
       success: false,
@@ -47,15 +58,23 @@ export function verifyWhatsAppWebhook(
   request: Request,
   response: Response,
 ): void {
-  const mode = request.query["hub.mode"];
-  const token = request.query["hub.verify_token"];
-  const challenge = request.query["hub.challenge"];
+  const mode =
+    request.query["hub.mode"];
+
+  const token =
+    request.query["hub.verify_token"];
+
+  const challenge =
+    request.query["hub.challenge"];
 
   if (
     mode === "subscribe" &&
     token === whatsappConfig.verifyToken
   ) {
-    response.status(200).send(challenge);
+    response
+      .status(200)
+      .send(challenge);
+
     return;
   }
 
@@ -68,60 +87,174 @@ export async function receiveWhatsAppWebhook(
 ): Promise<void> {
   console.log(
     "WhatsApp webhook received:",
-    JSON.stringify(request.body, null, 2),
+    JSON.stringify(
+      request.body,
+      null,
+      2,
+    ),
   );
 
-  const entries = request.body?.entry ?? [];
+  const entries =
+    request.body?.entry ?? [];
 
   for (const entry of entries) {
-    const changes = entry?.changes ?? [];
+    const changes =
+      entry?.changes ?? [];
 
     for (const change of changes) {
-      const value = change?.value;
+      const value =
+        change?.value;
 
-      const messages = value?.messages ?? [];
-      const contacts = value?.contacts ?? [];
+      const messages =
+        value?.messages ?? [];
+
+      const contacts =
+        value?.contacts ?? [];
 
       for (const message of messages) {
-        const contact = contacts.find(
-          (item: any) =>
-            item.wa_id === message.from,
+        const contact =
+          contacts.find(
+            (item: any) =>
+              item.wa_id ===
+              message.from,
+          );
+
+        console.log(
+          "Incoming WhatsApp message:",
+          {
+            from: message.from,
+            name:
+              contact?.profile?.name ??
+              null,
+            messageId: message.id,
+            type: message.type,
+            text:
+              message.text?.body ??
+              null,
+            timestamp:
+              message.timestamp,
+          },
         );
 
-        console.log("Incoming WhatsApp message:", {
-          from: message.from,
-          name: contact?.profile?.name ?? null,
-          messageId: message.id,
-          type: message.type,
-          text: message.text?.body ?? null,
-          timestamp: message.timestamp,
-        });
-
         try {
-  await saveIncomingWhatsAppMessage({
-    phoneNumber: message.from,
-    displayName:
-      contact?.profile?.name ?? null,
-    providerMessageId: message.id,
-    messageType: message.type,
-    body: message.text?.body ?? null,
-    timestamp: message.timestamp,
-    rawPayload: message,
-  });
+          await saveIncomingWhatsAppMessage({
+            phoneNumber:
+              message.from,
 
-  console.log(
-    "Incoming WhatsApp message saved.",
-    message.id,
-  );
-} catch (error) {
-  console.error(
-    "Failed to save incoming WhatsApp message:",
-    error,
-  );
-}
+            displayName:
+              contact?.profile?.name ??
+              null,
+
+            providerMessageId:
+              message.id,
+
+            messageType:
+              message.type,
+
+            body:
+              message.text?.body ??
+              null,
+
+            timestamp:
+              message.timestamp,
+
+            rawPayload:
+              message,
+          });
+
+          console.log(
+            "Incoming WhatsApp message saved.",
+            message.id,
+          );
+        } catch (error) {
+          console.error(
+            "Failed to save incoming WhatsApp message:",
+            error,
+          );
+        }
       }
     }
   }
 
   response.sendStatus(200);
+}
+
+export async function listWhatsAppConversations(
+  _request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const conversations =
+      await getWhatsAppConversations();
+
+    response.status(200).json({
+      success: true,
+      conversations,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to load WhatsApp conversations:",
+      error,
+    );
+
+    response.status(500).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to load WhatsApp conversations",
+    });
+  }
+}
+
+export async function listWhatsAppMessages(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const conversationParam =
+  request.params.id;
+
+const conversationId =
+  Array.isArray(conversationParam)
+    ? conversationParam[0]
+    : conversationParam;
+
+    if (!conversationId) {
+      response.status(400).json({
+        success: false,
+        error:
+          "Conversation ID is required",
+      });
+
+      return;
+    }
+
+    const messages =
+      await getWhatsAppConversationMessages(
+        conversationId,
+      );
+
+    await markWhatsAppConversationRead(
+      conversationId,
+    );
+
+    response.status(200).json({
+      success: true,
+      messages,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to load WhatsApp messages:",
+      error,
+    );
+
+    response.status(500).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to load WhatsApp messages",
+    });
+  }
 }

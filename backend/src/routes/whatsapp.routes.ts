@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import {
+  listWhatsAppConversations,
+  listWhatsAppMessages,
   receiveWhatsAppWebhook,
   sendTestWhatsAppMessage,
   verifyWhatsAppWebhook,
@@ -16,6 +18,16 @@ router.get(
 router.post(
   "/webhook",
   receiveWhatsAppWebhook,
+);
+
+router.get(
+  "/conversations",
+  listWhatsAppConversations,
+);
+
+router.get(
+  "/conversations/:id/messages",
+  listWhatsAppMessages,
 );
 
 router.post(
