@@ -5,9 +5,14 @@ import {
   listWhatsAppMessages,
   receiveWhatsAppWebhook,
   sendTestWhatsAppMessage,
-  verifyWhatsAppWebhook,
   sendWhatsAppConversationMessage,
+  verifyWhatsAppWebhook,
 } from "../controllers/whatsapp.controller.js";
+
+import {
+  requireAdmin,
+  requireAuth,
+} from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -17,28 +22,34 @@ router.get(
 );
 
 router.post(
-  "/conversations/:id/messages",
-  sendWhatsAppConversationMessage,
-);
-
-router.post(
   "/webhook",
   receiveWhatsAppWebhook,
-);
-
-router.get(
-  "/conversations",
-  listWhatsAppConversations,
-);
-
-router.get(
-  "/conversations/:id/messages",
-  listWhatsAppMessages,
 );
 
 router.post(
   "/test",
   sendTestWhatsAppMessage,
+);
+
+router.get(
+  "/conversations",
+  requireAuth,
+  requireAdmin,
+  listWhatsAppConversations,
+);
+
+router.get(
+  "/conversations/:id/messages",
+  requireAuth,
+  requireAdmin,
+  listWhatsAppMessages,
+);
+
+router.post(
+  "/conversations/:id/messages",
+  requireAuth,
+  requireAdmin,
+  sendWhatsAppConversationMessage,
 );
 
 export default router;

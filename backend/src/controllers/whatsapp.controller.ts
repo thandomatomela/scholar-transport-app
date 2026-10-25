@@ -2,6 +2,10 @@ import type { Request, Response } from "express";
 
 import { whatsappConfig } from "../config/whatsapp.config.js";
 
+import type {
+  AuthenticatedRequest,
+} from "../middleware/auth.middleware.js";
+
 import {
   getWhatsAppConversationById,
   getWhatsAppConversationMessages,
@@ -84,7 +88,7 @@ export function verifyWhatsAppWebhook(
 }
 
 export async function sendWhatsAppConversationMessage(
-  request: Request,
+  request: AuthenticatedRequest,
   response: Response,
 ): Promise<void> {
   try {
@@ -101,6 +105,16 @@ export async function sendWhatsAppConversationMessage(
         success: false,
         error: "Conversation ID is required",
       });
+
+      return;
+    }
+
+    if (!request.user) {
+      response.status(401).json({
+        success: false,
+        error: "Authentication required",
+      });
+
       return;
     }
 
@@ -116,6 +130,7 @@ export async function sendWhatsAppConversationMessage(
         success: false,
         error: "Message body is required",
       });
+
       return;
     }
 
@@ -128,7 +143,9 @@ export async function sendWhatsAppConversationMessage(
       conversation.whatsapp_contacts;
 
     const contact =
-      Array.isArray(contactRelation)
+      Array.isArray(
+        contactRelation,
+      )
         ? contactRelation[0]
         : contactRelation;
 
@@ -141,6 +158,7 @@ export async function sendWhatsAppConversationMessage(
         error:
           "No WhatsApp phone number is linked to this conversation",
       });
+
       return;
     }
 
@@ -160,16 +178,23 @@ export async function sendWhatsAppConversationMessage(
         providerMessageId,
         body: body.trim(),
 
-        // Temporary until auth is wired in:
-        sentByUserId: null,
-        sentByName: "Via Nova Admin",
-        sentByRole: "admin",
+        sentByUserId:
+          request.user.id,
+
+        sentByName:
+          request.user.fullName ??
+          request.user.email ??
+          "Via Nova Admin",
+
+        sentByRole:
+          request.user.role,
       });
 
     response.status(200).json({
       success: true,
       result,
-      message: savedMessage,
+      message:
+        savedMessage,
     });
   } catch (error) {
     console.error(
