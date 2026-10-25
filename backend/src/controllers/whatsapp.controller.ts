@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 import { whatsappConfig } from "../config/whatsapp.config.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import {
+  saveIncomingWhatsAppMessage,
+} from "../repositories/whatsapp.repository.js";
 
 
 export async function sendTestWhatsAppMessage(
@@ -93,6 +96,29 @@ export async function receiveWhatsAppWebhook(
           text: message.text?.body ?? null,
           timestamp: message.timestamp,
         });
+
+        try {
+  await saveIncomingWhatsAppMessage({
+    phoneNumber: message.from,
+    displayName:
+      contact?.profile?.name ?? null,
+    providerMessageId: message.id,
+    messageType: message.type,
+    body: message.text?.body ?? null,
+    timestamp: message.timestamp,
+    rawPayload: message,
+  });
+
+  console.log(
+    "Incoming WhatsApp message saved.",
+    message.id,
+  );
+} catch (error) {
+  console.error(
+    "Failed to save incoming WhatsApp message:",
+    error,
+  );
+}
       }
     }
   }
