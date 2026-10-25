@@ -197,14 +197,18 @@ export async function getWhatsAppConversationMessages(
   } = await supabase
     .from("whatsapp_messages")
     .select(`
-      id,
-      provider_message_id,
-      direction,
-      message_type,
-      body,
-      status,
-      whatsapp_timestamp,
-      created_at
+  id,
+  provider_message_id,
+  direction,
+  message_type,
+  body,
+  status,
+  whatsapp_timestamp,
+  sent_by_user_id,
+  sent_by_name,
+  sent_by_role,
+  created_at
+
     `)
     .eq(
       "conversation_id",
@@ -219,6 +223,112 @@ export async function getWhatsAppConversationMessages(
   }
 
   return data ?? [];
+}
+
+export async function saveOutgoingWhatsAppMessage({
+  conversationId,
+  providerMessageId,
+  body,
+  status = "sent",
+  sentByUserId,
+  sentByName,
+  sentByRole,
+}: {
+  conversationId: string;
+  providerMessageId: string | null;
+  body: string;
+  status?: string;
+  sentByUserId: string | null;
+  sentByName: string | null;
+  sentByRole: "admin" | "driver" | "system";
+}) {
+  const timestamp =
+    new Date().toISOString();
+
+  const {
+    data: insertedMessage,
+    error: insertError,
+  } = await supabase
+    .from("whatsapp_messages")
+    .insert({
+      conversation_id:
+        conversationId,
+      provider_message_id:
+        providerMessageId,
+      direction: "outbound",
+      message_type: "text",
+      body,
+      status,
+      whatsapp_timestamp:
+        timestamp,
+      sent_by_user_id:
+        sentByUserId,
+      sent_by_name:
+        sentByName,
+      sent_by_role:
+        sentByRole,
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  const {
+    error:
+      conversationUpdateError,
+  } = await supabase
+    .from(
+      "whatsapp_conversations",
+    )
+    .update({
+      last_message_at:
+        timestamp,
+      last_message_preview:
+        body,
+      updated_at:
+        timestamp,
+    })
+    .eq(
+      "id",
+      conversationId,
+    );
+
+  if (
+    conversationUpdateError
+  ) {
+    throw conversationUpdateError;
+  }
+
+  return insertedMessage;
+}
+
+export async function getWhatsAppConversationById(
+  conversationId: string,
+) {
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("whatsapp_conversations")
+    .select(`
+      id,
+      contact_id,
+      whatsapp_contacts (
+        id,
+        phone_number,
+        display_name
+      )
+    `)
+    .eq("id", conversationId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 export async function markWhatsAppConversationRead(
@@ -237,4 +347,4 @@ export async function markWhatsAppConversationRead(
   if (error) {
     throw error;
   }
-}
+} 

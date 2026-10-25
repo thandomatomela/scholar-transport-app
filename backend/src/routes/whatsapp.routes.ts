@@ -6,6 +6,7 @@ import {
   receiveWhatsAppWebhook,
   sendTestWhatsAppMessage,
   verifyWhatsAppWebhook,
+  sendWhatsAppConversationMessage,
 } from "../controllers/whatsapp.controller.js";
 
 const router = Router();
@@ -13,6 +14,11 @@ const router = Router();
 router.get(
   "/webhook",
   verifyWhatsAppWebhook,
+);
+
+router.post(
+  "/conversations/:id/messages",
+  sendWhatsAppConversationMessage,
 );
 
 router.post(

@@ -3,10 +3,12 @@ import type { Request, Response } from "express";
 import { whatsappConfig } from "../config/whatsapp.config.js";
 
 import {
+  getWhatsAppConversationById,
   getWhatsAppConversationMessages,
   getWhatsAppConversations,
   markWhatsAppConversationRead,
   saveIncomingWhatsAppMessage,
+  saveOutgoingWhatsAppMessage,
 } from "../repositories/whatsapp.repository.js";
 
 import {
@@ -79,6 +81,110 @@ export function verifyWhatsAppWebhook(
   }
 
   response.sendStatus(403);
+}
+
+export async function sendWhatsAppConversationMessage(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const conversationParam =
+      request.params.id;
+
+    const conversationId =
+      Array.isArray(conversationParam)
+        ? conversationParam[0]
+        : conversationParam;
+
+    if (!conversationId) {
+      response.status(400).json({
+        success: false,
+        error: "Conversation ID is required",
+      });
+      return;
+    }
+
+    const { body } =
+      request.body;
+
+    if (
+      !body ||
+      typeof body !== "string" ||
+      !body.trim()
+    ) {
+      response.status(400).json({
+        success: false,
+        error: "Message body is required",
+      });
+      return;
+    }
+
+    const conversation =
+      await getWhatsAppConversationById(
+        conversationId,
+      );
+
+    const contactRelation =
+      conversation.whatsapp_contacts;
+
+    const contact =
+      Array.isArray(contactRelation)
+        ? contactRelation[0]
+        : contactRelation;
+
+    const phoneNumber =
+      contact?.phone_number;
+
+    if (!phoneNumber) {
+      response.status(400).json({
+        success: false,
+        error:
+          "No WhatsApp phone number is linked to this conversation",
+      });
+      return;
+    }
+
+    const result =
+      await sendWhatsAppMessage(
+        phoneNumber,
+        body.trim(),
+      );
+
+    const providerMessageId =
+      result?.messages?.[0]?.id ??
+      null;
+
+    const savedMessage =
+      await saveOutgoingWhatsAppMessage({
+        conversationId,
+        providerMessageId,
+        body: body.trim(),
+
+        // Temporary until auth is wired in:
+        sentByUserId: null,
+        sentByName: "Via Nova Admin",
+        sentByRole: "admin",
+      });
+
+    response.status(200).json({
+      success: true,
+      result,
+      message: savedMessage,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to send WhatsApp conversation message:",
+      error,
+    );
+
+    response.status(500).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to send WhatsApp message",
+    });
+  }
 }
 
 export async function receiveWhatsAppWebhook(
