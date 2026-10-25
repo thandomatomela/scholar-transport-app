@@ -40,6 +40,13 @@ export type CrmLossReason =
   | "no_response"
   | "other";
 
+export type RouteAssessmentStatus =
+  | "not_assessed"
+  | "existing_route_match"
+  | "route_extension"
+  | "new_route_opportunity"
+  | "not_serviceable";
+
 export type CreateCrmEnquiryInput = {
   source?: CrmSource;
 
@@ -55,13 +62,40 @@ export type CreateCrmEnquiryInput = {
   grade?: string | null;
 
   pickupAddress?: string | null;
+  pickupSuburb?: string | null;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+
   dropoffAddress?: string | null;
+  dropoffSuburb?: string | null;
+  dropoffLatitude?: number | null;
+  dropoffLongitude?: number | null;
+
+  schoolLatitude?: number | null;
+  schoolLongitude?: number | null;
 
   serviceType?: CrmServiceType | null;
 
   requestedStartDate?: string | null;
 
+  mondayMorning?: boolean;
+  mondayAfternoon?: boolean;
+
+  tuesdayMorning?: boolean;
+  tuesdayAfternoon?: boolean;
+
+  wednesdayMorning?: boolean;
+  wednesdayAfternoon?: boolean;
+
+  thursdayMorning?: boolean;
+  thursdayAfternoon?: boolean;
+
+  fridayMorning?: boolean;
+  fridayAfternoon?: boolean;
+
   estimatedMonthlyValue?: number | null;
+
+  routeAssessmentStatus?: RouteAssessmentStatus | null;
 
   notes?: string | null;
 
@@ -85,11 +119,36 @@ export type UpdateCrmEnquiryInput = {
   grade?: string | null;
 
   pickupAddress?: string | null;
+  pickupSuburb?: string | null;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+
   dropoffAddress?: string | null;
+  dropoffSuburb?: string | null;
+  dropoffLatitude?: number | null;
+  dropoffLongitude?: number | null;
+
+  schoolLatitude?: number | null;
+  schoolLongitude?: number | null;
 
   serviceType?: CrmServiceType | null;
 
   requestedStartDate?: string | null;
+
+  mondayMorning?: boolean;
+  mondayAfternoon?: boolean;
+
+  tuesdayMorning?: boolean;
+  tuesdayAfternoon?: boolean;
+
+  wednesdayMorning?: boolean;
+  wednesdayAfternoon?: boolean;
+
+  thursdayMorning?: boolean;
+  thursdayAfternoon?: boolean;
+
+  fridayMorning?: boolean;
+  fridayAfternoon?: boolean;
 
   estimatedMonthlyValue?: number | null;
 
@@ -98,6 +157,17 @@ export type UpdateCrmEnquiryInput = {
 
   lossReason?: CrmLossReason | null;
   lossNotes?: string | null;
+
+  routeAssessmentStatus?: RouteAssessmentStatus | null;
+  routeAssessmentNotes?: string | null;
+
+  suggestedMonthlyFee?: number | null;
+  quotedMonthlyFee?: number | null;
+
+  estimatedAdditionalDailyKm?: number | null;
+  estimatedMonthlyOperatingCost?: number | null;
+
+  routeMatchScore?: number | null;
 
   notes?: string | null;
 
@@ -118,6 +188,9 @@ export async function createCrmEnquiry(
       source:
         input.source ??
         "website",
+
+      status:
+        "new",
 
       parent_first_name:
         input.parentFirstName ??
@@ -155,8 +228,40 @@ export async function createCrmEnquiry(
         input.pickupAddress ??
         null,
 
+      pickup_suburb:
+        input.pickupSuburb ??
+        null,
+
+      pickup_latitude:
+        input.pickupLatitude ??
+        null,
+
+      pickup_longitude:
+        input.pickupLongitude ??
+        null,
+
       dropoff_address:
         input.dropoffAddress ??
+        null,
+
+      dropoff_suburb:
+        input.dropoffSuburb ??
+        null,
+
+      dropoff_latitude:
+        input.dropoffLatitude ??
+        null,
+
+      dropoff_longitude:
+        input.dropoffLongitude ??
+        null,
+
+      school_latitude:
+        input.schoolLatitude ??
+        null,
+
+      school_longitude:
+        input.schoolLongitude ??
         null,
 
       service_type:
@@ -167,9 +272,53 @@ export async function createCrmEnquiry(
         input.requestedStartDate ??
         null,
 
+      monday_morning:
+        input.mondayMorning ??
+        false,
+
+      monday_afternoon:
+        input.mondayAfternoon ??
+        false,
+
+      tuesday_morning:
+        input.tuesdayMorning ??
+        false,
+
+      tuesday_afternoon:
+        input.tuesdayAfternoon ??
+        false,
+
+      wednesday_morning:
+        input.wednesdayMorning ??
+        false,
+
+      wednesday_afternoon:
+        input.wednesdayAfternoon ??
+        false,
+
+      thursday_morning:
+        input.thursdayMorning ??
+        false,
+
+      thursday_afternoon:
+        input.thursdayAfternoon ??
+        false,
+
+      friday_morning:
+        input.fridayMorning ??
+        false,
+
+      friday_afternoon:
+        input.fridayAfternoon ??
+        false,
+
       estimated_monthly_value:
         input.estimatedMonthlyValue ??
         null,
+
+      route_assessment_status:
+        input.routeAssessmentStatus ??
+        "not_assessed",
 
       notes:
         input.notes ??
@@ -343,172 +492,244 @@ export async function updateCrmEnquiry(
       new Date().toISOString(),
   };
 
-  if (
-    input.status !==
-    undefined
-  ) {
-    updateData.status =
-      input.status;
-  }
+  const mappings: Array<
+    [
+      keyof UpdateCrmEnquiryInput,
+      string,
+    ]
+  > = [
+    ["status", "status"],
 
-  if (
-    input.parentFirstName !==
-    undefined
-  ) {
-    updateData.parent_first_name =
-      input.parentFirstName;
-  }
+    [
+      "parentFirstName",
+      "parent_first_name",
+    ],
 
-  if (
-    input.parentLastName !==
-    undefined
-  ) {
-    updateData.parent_last_name =
-      input.parentLastName;
-  }
+    [
+      "parentLastName",
+      "parent_last_name",
+    ],
 
-  if (
-    input.phoneNumber !==
-    undefined
-  ) {
-    updateData.phone_number =
-      input.phoneNumber;
-  }
+    [
+      "phoneNumber",
+      "phone_number",
+    ],
 
-  if (
-    input.whatsappNumber !==
-    undefined
-  ) {
-    updateData.whatsapp_number =
-      input.whatsappNumber;
-  }
+    [
+      "whatsappNumber",
+      "whatsapp_number",
+    ],
 
-  if (
-    input.email !==
-    undefined
-  ) {
-    updateData.email =
-      input.email;
-  }
+    ["email", "email"],
 
-  if (
-    input.learnerName !==
-    undefined
-  ) {
-    updateData.learner_name =
-      input.learnerName;
-  }
+    [
+      "learnerName",
+      "learner_name",
+    ],
 
-  if (
-    input.schoolName !==
-    undefined
-  ) {
-    updateData.school_name =
-      input.schoolName;
-  }
+    [
+      "schoolName",
+      "school_name",
+    ],
 
-  if (
-    input.grade !==
-    undefined
-  ) {
-    updateData.grade =
-      input.grade;
-  }
+    ["grade", "grade"],
 
-  if (
-    input.pickupAddress !==
-    undefined
-  ) {
-    updateData.pickup_address =
-      input.pickupAddress;
-  }
+    [
+      "pickupAddress",
+      "pickup_address",
+    ],
 
-  if (
-    input.dropoffAddress !==
-    undefined
-  ) {
-    updateData.dropoff_address =
-      input.dropoffAddress;
-  }
+    [
+      "pickupSuburb",
+      "pickup_suburb",
+    ],
 
-  if (
-    input.serviceType !==
-    undefined
-  ) {
-    updateData.service_type =
-      input.serviceType;
-  }
+    [
+      "pickupLatitude",
+      "pickup_latitude",
+    ],
 
-  if (
-    input.requestedStartDate !==
-    undefined
-  ) {
-    updateData.requested_start_date =
-      input.requestedStartDate;
-  }
+    [
+      "pickupLongitude",
+      "pickup_longitude",
+    ],
 
-  if (
-    input.estimatedMonthlyValue !==
-    undefined
-  ) {
-    updateData.estimated_monthly_value =
-      input.estimatedMonthlyValue;
-  }
+    [
+      "dropoffAddress",
+      "dropoff_address",
+    ],
 
-  if (
-    input.lastContactAt !==
-    undefined
-  ) {
-    updateData.last_contact_at =
-      input.lastContactAt;
-  }
+    [
+      "dropoffSuburb",
+      "dropoff_suburb",
+    ],
 
-  if (
-    input.nextFollowUpAt !==
-    undefined
-  ) {
-    updateData.next_follow_up_at =
-      input.nextFollowUpAt;
-  }
+    [
+      "dropoffLatitude",
+      "dropoff_latitude",
+    ],
 
-  if (
-    input.lossReason !==
-    undefined
-  ) {
-    updateData.loss_reason =
-      input.lossReason;
-  }
+    [
+      "dropoffLongitude",
+      "dropoff_longitude",
+    ],
 
-  if (
-    input.lossNotes !==
-    undefined
-  ) {
-    updateData.loss_notes =
-      input.lossNotes;
-  }
+    [
+      "schoolLatitude",
+      "school_latitude",
+    ],
 
-  if (
-    input.notes !==
-    undefined
-  ) {
-    updateData.notes =
-      input.notes;
-  }
+    [
+      "schoolLongitude",
+      "school_longitude",
+    ],
 
-  if (
-    input.whatsappContactId !==
-    undefined
-  ) {
-    updateData.whatsapp_contact_id =
-      input.whatsappContactId;
-  }
+    [
+      "serviceType",
+      "service_type",
+    ],
 
-  if (
-    input.assignedTo !==
-    undefined
+    [
+      "requestedStartDate",
+      "requested_start_date",
+    ],
+
+    [
+      "mondayMorning",
+      "monday_morning",
+    ],
+
+    [
+      "mondayAfternoon",
+      "monday_afternoon",
+    ],
+
+    [
+      "tuesdayMorning",
+      "tuesday_morning",
+    ],
+
+    [
+      "tuesdayAfternoon",
+      "tuesday_afternoon",
+    ],
+
+    [
+      "wednesdayMorning",
+      "wednesday_morning",
+    ],
+
+    [
+      "wednesdayAfternoon",
+      "wednesday_afternoon",
+    ],
+
+    [
+      "thursdayMorning",
+      "thursday_morning",
+    ],
+
+    [
+      "thursdayAfternoon",
+      "thursday_afternoon",
+    ],
+
+    [
+      "fridayMorning",
+      "friday_morning",
+    ],
+
+    [
+      "fridayAfternoon",
+      "friday_afternoon",
+    ],
+
+    [
+      "estimatedMonthlyValue",
+      "estimated_monthly_value",
+    ],
+
+    [
+      "lastContactAt",
+      "last_contact_at",
+    ],
+
+    [
+      "nextFollowUpAt",
+      "next_follow_up_at",
+    ],
+
+    [
+      "lossReason",
+      "loss_reason",
+    ],
+
+    [
+      "lossNotes",
+      "loss_notes",
+    ],
+
+    [
+      "routeAssessmentStatus",
+      "route_assessment_status",
+    ],
+
+    [
+      "routeAssessmentNotes",
+      "route_assessment_notes",
+    ],
+
+    [
+      "suggestedMonthlyFee",
+      "suggested_monthly_fee",
+    ],
+
+    [
+      "quotedMonthlyFee",
+      "quoted_monthly_fee",
+    ],
+
+    [
+      "estimatedAdditionalDailyKm",
+      "estimated_additional_daily_km",
+    ],
+
+    [
+      "estimatedMonthlyOperatingCost",
+      "estimated_monthly_operating_cost",
+    ],
+
+    [
+      "routeMatchScore",
+      "route_match_score",
+    ],
+
+    ["notes", "notes"],
+
+    [
+      "whatsappContactId",
+      "whatsapp_contact_id",
+    ],
+
+    [
+      "assignedTo",
+      "assigned_to",
+    ],
+  ];
+
+  for (
+    const [
+      inputKey,
+      databaseKey,
+    ] of mappings
   ) {
-    updateData.assigned_to =
-      input.assignedTo;
+    if (
+      input[inputKey] !==
+      undefined
+    ) {
+      updateData[databaseKey] =
+        input[inputKey];
+    }
   }
 
   const {
