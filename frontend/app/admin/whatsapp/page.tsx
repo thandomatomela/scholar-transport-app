@@ -5,6 +5,14 @@ import {
   useState,
 } from "react";
 
+import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  supabase,
+} from "../../../lib/supabase/client";
+
 type WhatsAppContact = {
   id: string;
   phone_number: string;
@@ -28,33 +36,14 @@ type Conversation = {
 type Message = {
   id: string;
   provider_message_id: string | null;
-
-  direction:
-    | "inbound"
-    | "outbound";
-
+  direction: "inbound" | "outbound";
   message_type: string;
-
   body: string | null;
-
   status: string | null;
-
-  whatsapp_timestamp:
-    | string
-    | null;
-
-  sent_by_user_id:
-    | string
-    | null;
-
-  sent_by_name:
-    | string
-    | null;
-
-  sent_by_role:
-    | string
-    | null;
-
+  whatsapp_timestamp: string | null;
+  sent_by_user_id: string | null;
+  sent_by_name: string | null;
+  sent_by_role: string | null;
   created_at: string;
 };
 
@@ -92,6 +81,9 @@ function formatDate(
 }
 
 export default function WhatsAppInboxPage() {
+  const router =
+    useRouter();
+
   const [
     conversations,
     setConversations,
@@ -124,6 +116,11 @@ export default function WhatsAppInboxPage() {
   ] = useState(false);
 
   const [
+    checkingAuth,
+    setCheckingAuth,
+  ] = useState(true);
+
+  const [
     error,
     setError,
   ] = useState<
@@ -131,21 +128,95 @@ export default function WhatsAppInboxPage() {
   >(null);
 
   useEffect(() => {
-    void loadConversations();
+    void initialisePage();
   }, []);
 
-  async function loadConversations() {
+  async function getAccessToken() {
+    const {
+      data,
+      error:
+        sessionError,
+    } =
+      await supabase.auth.getSession();
+
+    if (
+      sessionError ||
+      !data.session
+    ) {
+      return null;
+    }
+
+    return data.session.access_token;
+  }
+
+  async function initialisePage() {
+    try {
+      setCheckingAuth(true);
+
+      const token =
+        await getAccessToken();
+
+      if (!token) {
+        router.replace(
+          "/admin/login",
+        );
+
+        return;
+      }
+
+      await loadConversations(
+        token,
+      );
+    } finally {
+      setCheckingAuth(false);
+    }
+  }
+
+  async function loadConversations(
+    suppliedToken?: string,
+  ) {
     try {
       setLoading(true);
       setError(null);
+
+      const token =
+        suppliedToken ??
+        (await getAccessToken());
+
+      if (!token) {
+        router.replace(
+          "/admin/login",
+        );
+
+        return;
+      }
 
       const response =
         await fetch(
           "/api/whatsapp/conversations",
           {
-            cache: "no-store",
+            cache:
+              "no-store",
+
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
           },
         );
+
+      if (
+        response.status ===
+        401
+      ) {
+        await supabase.auth.signOut();
+
+        router.replace(
+          "/admin/login",
+        );
+
+        return;
+      }
 
       const data =
         await response.json();
@@ -160,7 +231,8 @@ export default function WhatsAppInboxPage() {
         );
       }
 
-      const result: Conversation[] =
+      const result:
+        Conversation[] =
         data.conversations ??
         [];
 
@@ -181,6 +253,7 @@ export default function WhatsAppInboxPage() {
 
         await loadMessages(
           firstId,
+          token,
         );
       }
     } catch (err) {
@@ -196,6 +269,7 @@ export default function WhatsAppInboxPage() {
 
   async function loadMessages(
     conversationId: string,
+    suppliedToken?: string,
   ) {
     try {
       setLoadingMessages(
@@ -204,13 +278,44 @@ export default function WhatsAppInboxPage() {
 
       setError(null);
 
+      const token =
+        suppliedToken ??
+        (await getAccessToken());
+
+      if (!token) {
+        router.replace(
+          "/admin/login",
+        );
+
+        return;
+      }
+
       const response =
         await fetch(
           `/api/whatsapp/conversations/${conversationId}/messages`,
           {
-            cache: "no-store",
+            cache:
+              "no-store",
+
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
           },
         );
+
+      if (
+        response.status ===
+        401
+      ) {
+        await supabase.auth.signOut();
+
+        router.replace(
+          "/admin/login",
+        );
+
+        return;
+      }
 
       const data =
         await response.json();
@@ -267,6 +372,14 @@ export default function WhatsAppInboxPage() {
     );
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+
+    router.replace(
+      "/admin/login",
+    );
+  }
+
   const selectedConversation =
     conversations.find(
       (conversation) =>
@@ -281,22 +394,42 @@ export default function WhatsAppInboxPage() {
         )
       : null;
 
+  if (checkingAuth) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center p-6">
+        <p className="text-sm text-slate-500">
+          Checking authentication...
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="p-4 md:p-6">
-      <div className="mb-6">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">
-          Communications
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">
+            Communications
+          </p>
 
-        <h1 className="mt-2 text-2xl font-bold text-slate-950">
-          WhatsApp Inbox
-        </h1>
+          <h1 className="mt-2 text-2xl font-bold text-slate-950">
+            WhatsApp Inbox
+          </h1>
 
-        <p className="mt-1 text-sm text-slate-500">
-          Parent and guardian
-          conversations received
-          through Via Nova.
-        </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Parent and guardian conversations received through Via Nova.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            void handleLogout()
+          }
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Sign out
+        </button>
       </div>
 
       {error && (
@@ -428,8 +561,7 @@ export default function WhatsAppInboxPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Parent messages
-                  will appear here.
+                  Parent messages will appear here.
                 </p>
               </div>
             </div>
@@ -536,13 +668,6 @@ export default function WhatsAppInboxPage() {
                     Send
                   </button>
                 </div>
-
-                <p className="mt-2 text-xs text-slate-400">
-                  Sending is intentionally
-                  disabled while we
-                  validate the inbox
-                  first.
-                </p>
               </div>
             </>
           )}
