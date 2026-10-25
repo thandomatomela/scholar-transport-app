@@ -1,18 +1,24 @@
-import { supabase } from "../config/supabase.js";
+import {
+  supabase,
+} from "../config/supabase.js";
 
-type IncomingWhatsAppMessage = {
+export async function saveIncomingWhatsAppMessage({
+  phoneNumber,
+  displayName,
+  providerMessageId,
+  messageType,
+  body,
+  timestamp,
+  rawPayload,
+}: {
   phoneNumber: string;
-  displayName?: string | null;
+  displayName: string | null;
   providerMessageId: string;
   messageType: string;
-  body?: string | null;
-  timestamp?: string | null;
+  body: string | null;
+  timestamp: string;
   rawPayload: unknown;
-};
-
-export async function saveIncomingWhatsAppMessage(
-  message: IncomingWhatsAppMessage,
-) {
+}) {
   const {
     data: contact,
     error: contactError,
@@ -20,12 +26,18 @@ export async function saveIncomingWhatsAppMessage(
     .from("whatsapp_contacts")
     .upsert(
       {
-        phone_number: message.phoneNumber,
-        display_name: message.displayName ?? null,
-        updated_at: new Date().toISOString(),
+        phone_number:
+          phoneNumber,
+
+        display_name:
+          displayName,
+
+        updated_at:
+          new Date().toISOString(),
       },
       {
-        onConflict: "phone_number",
+        onConflict:
+          "phone_number",
       },
     )
     .select()
@@ -35,124 +47,165 @@ export async function saveIncomingWhatsAppMessage(
     throw contactError;
   }
 
-  const {
-    data: existingConversation,
-    error: conversationLookupError,
+  let {
+    data: conversation,
+    error: conversationError,
   } = await supabase
-    .from("whatsapp_conversations")
+    .from(
+      "whatsapp_conversations",
+    )
     .select("*")
-    .eq("contact_id", contact.id)
+    .eq(
+      "contact_id",
+      contact.id,
+    )
     .maybeSingle();
 
-  if (conversationLookupError) {
-    throw conversationLookupError;
+  if (conversationError) {
+    throw conversationError;
   }
-
-  let conversation = existingConversation;
 
   if (!conversation) {
     const {
-      data: createdConversation,
-      error: createConversationError,
+      data:
+        createdConversation,
+      error:
+        createConversationError,
     } = await supabase
-      .from("whatsapp_conversations")
+      .from(
+        "whatsapp_conversations",
+      )
       .insert({
-        contact_id: contact.id,
-        last_message_at: message.timestamp
-          ? new Date(
-              Number(message.timestamp) * 1000,
-            ).toISOString()
-          : new Date().toISOString(),
-        last_message_preview:
-          message.body?.slice(0, 200) ?? null,
-        unread_count: 0,
+        contact_id:
+          contact.id,
       })
       .select()
       .single();
 
-    if (createConversationError) {
+    if (
+      createConversationError
+    ) {
       throw createConversationError;
     }
 
-    conversation = createdConversation;
+    conversation =
+      createdConversation;
   }
 
   const {
-    data: existingMessage,
-    error: existingMessageError,
+    data:
+      existingMessage,
+    error:
+      existingMessageError,
   } = await supabase
-    .from("whatsapp_messages")
+    .from(
+      "whatsapp_messages",
+    )
     .select("id")
     .eq(
       "provider_message_id",
-      message.providerMessageId,
+      providerMessageId,
     )
     .maybeSingle();
 
-  if (existingMessageError) {
+  if (
+    existingMessageError
+  ) {
     throw existingMessageError;
   }
 
   if (existingMessage) {
-    return {
-      contact,
-      conversation,
-      duplicate: true,
-    };
+    return existingMessage;
   }
 
   const whatsappTimestamp =
-    message.timestamp
+    timestamp
       ? new Date(
-          Number(message.timestamp) * 1000,
+          Number(timestamp) *
+            1000,
         ).toISOString()
-      : null;
+      : new Date().toISOString();
 
   const {
-    error: messageError,
+    data:
+      insertedMessage,
+    error:
+      insertMessageError,
   } = await supabase
-    .from("whatsapp_messages")
+    .from(
+      "whatsapp_messages",
+    )
     .insert({
-      conversation_id: conversation.id,
-      provider_message_id:
-        message.providerMessageId,
-      direction: "inbound",
-      message_type: message.messageType,
-      body: message.body ?? null,
-      status: "received",
-      whatsapp_timestamp: whatsappTimestamp,
-      raw_payload: message.rawPayload,
-    });
+      conversation_id:
+        conversation.id,
 
-  if (messageError) {
-    throw messageError;
+      provider_message_id:
+        providerMessageId,
+
+      direction:
+        "inbound",
+
+      message_type:
+        messageType,
+
+      body,
+
+      status:
+        "received",
+
+      whatsapp_timestamp:
+        whatsappTimestamp,
+
+      raw_payload:
+        rawPayload,
+    })
+    .select()
+    .single();
+
+  if (
+    insertMessageError
+  ) {
+    throw insertMessageError;
   }
 
+  const currentUnreadCount =
+    conversation.unread_count ??
+    0;
+
   const {
-    error: conversationUpdateError,
+    error:
+      conversationUpdateError,
   } = await supabase
-    .from("whatsapp_conversations")
+    .from(
+      "whatsapp_conversations",
+    )
     .update({
       last_message_at:
-        whatsappTimestamp ??
-        new Date().toISOString(),
-      last_message_preview:
-        message.body?.slice(0, 200) ?? null,
-      unread_count:
-        (conversation.unread_count ?? 0) + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", conversation.id);
+        whatsappTimestamp,
 
-  if (conversationUpdateError) {
+      last_message_preview:
+        body ??
+        `[${messageType}]`,
+
+      unread_count:
+        currentUnreadCount +
+        1,
+
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      conversation.id,
+    );
+
+  if (
+    conversationUpdateError
+  ) {
     throw conversationUpdateError;
   }
 
-  return {
-    contact,
-    conversation,
-    duplicate: false,
-  };
+  return insertedMessage;
 }
 
 export async function getWhatsAppConversations() {
@@ -160,7 +213,9 @@ export async function getWhatsAppConversations() {
     data,
     error,
   } = await supabase
-    .from("whatsapp_conversations")
+    .from(
+      "whatsapp_conversations",
+    )
     .select(`
       id,
       last_message_at,
@@ -176,10 +231,13 @@ export async function getWhatsAppConversations() {
         learner_id
       )
     `)
-    .order("last_message_at", {
-      ascending: false,
-      nullsFirst: false,
-    });
+    .order(
+      "last_message_at",
+      {
+        ascending: false,
+        nullsFirst: false,
+      },
+    );
 
   if (error) {
     throw error;
@@ -195,34 +253,68 @@ export async function getWhatsAppConversationMessages(
     data,
     error,
   } = await supabase
-    .from("whatsapp_messages")
+    .from(
+      "whatsapp_messages",
+    )
     .select(`
-  id,
-  provider_message_id,
-  direction,
-  message_type,
-  body,
-  status,
-  whatsapp_timestamp,
-  sent_by_user_id,
-  sent_by_name,
-  sent_by_role,
-  created_at
-
+      id,
+      provider_message_id,
+      direction,
+      message_type,
+      body,
+      status,
+      whatsapp_timestamp,
+      status_error_code,
+      status_error_title,
+      status_error_message,
+      status_error_details,
+      status_updated_at,
+      sent_by_user_id,
+      sent_by_name,
+      sent_by_role,
+      created_at
     `)
     .eq(
       "conversation_id",
       conversationId,
     )
-    .order("created_at", {
-      ascending: true,
-    });
+    .order(
+      "created_at",
+      {
+        ascending: true,
+      },
+    );
 
   if (error) {
     throw error;
   }
 
   return data ?? [];
+}
+
+export async function markWhatsAppConversationRead(
+  conversationId: string,
+) {
+  const {
+    error,
+  } = await supabase
+    .from(
+      "whatsapp_conversations",
+    )
+    .update({
+      unread_count: 0,
+
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      conversationId,
+    );
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function saveOutgoingWhatsAppMessage({
@@ -240,31 +332,49 @@ export async function saveOutgoingWhatsAppMessage({
   status?: string;
   sentByUserId: string | null;
   sentByName: string | null;
-  sentByRole: "admin" | "driver" | "system";
+  sentByRole:
+    | "admin"
+    | "driver"
+    | "system";
 }) {
   const timestamp =
     new Date().toISOString();
 
   const {
-    data: insertedMessage,
-    error: insertError,
+    data:
+      insertedMessage,
+    error:
+      insertError,
   } = await supabase
-    .from("whatsapp_messages")
+    .from(
+      "whatsapp_messages",
+    )
     .insert({
       conversation_id:
         conversationId,
+
       provider_message_id:
         providerMessageId,
-      direction: "outbound",
-      message_type: "text",
+
+      direction:
+        "outbound",
+
+      message_type:
+        "text",
+
       body,
+
       status,
+
       whatsapp_timestamp:
         timestamp,
+
       sent_by_user_id:
         sentByUserId,
+
       sent_by_name:
         sentByName,
+
       sent_by_role:
         sentByRole,
     })
@@ -285,8 +395,10 @@ export async function saveOutgoingWhatsAppMessage({
     .update({
       last_message_at:
         timestamp,
+
       last_message_preview:
         body,
+
       updated_at:
         timestamp,
     })
@@ -311,7 +423,9 @@ export async function getWhatsAppConversationById(
     data,
     error,
   } = await supabase
-    .from("whatsapp_conversations")
+    .from(
+      "whatsapp_conversations",
+    )
     .select(`
       id,
       contact_id,
@@ -321,7 +435,10 @@ export async function getWhatsAppConversationById(
         display_name
       )
     `)
-    .eq("id", conversationId)
+    .eq(
+      "id",
+      conversationId,
+    )
     .single();
 
   if (error) {
@@ -331,20 +448,66 @@ export async function getWhatsAppConversationById(
   return data;
 }
 
-export async function markWhatsAppConversationRead(
-  conversationId: string,
-) {
+export async function updateWhatsAppMessageStatus({
+  providerMessageId,
+  status,
+  timestamp,
+  errorCode,
+  errorTitle,
+  errorMessage,
+  errorDetails,
+}: {
+  providerMessageId: string;
+  status: string;
+  timestamp: string | null;
+  errorCode: number | null;
+  errorTitle: string | null;
+  errorMessage: string | null;
+  errorDetails: string | null;
+}) {
+  const statusUpdatedAt =
+    timestamp
+      ? new Date(
+          Number(timestamp) *
+            1000,
+        ).toISOString()
+      : new Date().toISOString();
+
   const {
+    data,
     error,
   } = await supabase
-    .from("whatsapp_conversations")
+    .from(
+      "whatsapp_messages",
+    )
     .update({
-      unread_count: 0,
-      updated_at: new Date().toISOString(),
+      status,
+
+      status_updated_at:
+        statusUpdatedAt,
+
+      status_error_code:
+        errorCode,
+
+      status_error_title:
+        errorTitle,
+
+      status_error_message:
+        errorMessage,
+
+      status_error_details:
+        errorDetails,
     })
-    .eq("id", conversationId);
+    .eq(
+      "provider_message_id",
+      providerMessageId,
+    )
+    .select()
+    .maybeSingle();
 
   if (error) {
     throw error;
   }
-} 
+
+  return data;
+}
