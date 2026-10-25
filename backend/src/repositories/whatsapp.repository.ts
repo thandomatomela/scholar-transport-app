@@ -120,8 +120,7 @@ export async function saveIncomingWhatsAppMessage(
       message_type: message.messageType,
       body: message.body ?? null,
       status: "received",
-      whatsapp_timestamp:
-        whatsappTimestamp,
+      whatsapp_timestamp: whatsappTimestamp,
       raw_payload: message.rawPayload,
     });
 
@@ -154,4 +153,88 @@ export async function saveIncomingWhatsAppMessage(
     conversation,
     duplicate: false,
   };
+}
+
+export async function getWhatsAppConversations() {
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("whatsapp_conversations")
+    .select(`
+      id,
+      last_message_at,
+      last_message_preview,
+      unread_count,
+      created_at,
+      updated_at,
+      whatsapp_contacts (
+        id,
+        phone_number,
+        display_name,
+        parent_id,
+        learner_id
+      )
+    `)
+    .order("last_message_at", {
+      ascending: false,
+      nullsFirst: false,
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+export async function getWhatsAppConversationMessages(
+  conversationId: string,
+) {
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("whatsapp_messages")
+    .select(`
+      id,
+      provider_message_id,
+      direction,
+      message_type,
+      body,
+      status,
+      whatsapp_timestamp,
+      created_at
+    `)
+    .eq(
+      "conversation_id",
+      conversationId,
+    )
+    .order("created_at", {
+      ascending: true,
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+export async function markWhatsAppConversationRead(
+  conversationId: string,
+) {
+  const {
+    error,
+  } = await supabase
+    .from("whatsapp_conversations")
+    .update({
+      unread_count: 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId);
+
+  if (error) {
+    throw error;
+  }
 }
