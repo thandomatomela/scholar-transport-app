@@ -12,6 +12,11 @@ const navigationItems = [
     icon: "▦",
   },
   {
+    label: "Enquiries",
+    href: "/admin/enquiries",
+    icon: "📋",
+  },
+  {
     label: "Applications",
     href: "/admin/applications",
     icon: "📝",

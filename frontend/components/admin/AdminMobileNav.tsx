@@ -11,6 +11,10 @@ const navigationItems = [
     href: "/admin",
   },
   {
+    label: "Enquiries",
+    href: "/admin/enquiries",
+  },
+  {
     label: "Applications",
     href: "/admin/applications",
   },
