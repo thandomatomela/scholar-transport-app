@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   receiveWhatsAppWebhook,
+  sendTestWhatsAppMessage,
   verifyWhatsAppWebhook,
 } from "../controllers/whatsapp.controller.js";
 
@@ -15,6 +16,11 @@ router.get(
 router.post(
   "/webhook",
   receiveWhatsAppWebhook,
+);
+
+router.post(
+  "/test",
+  sendTestWhatsAppMessage,
 );
 
 export default router;

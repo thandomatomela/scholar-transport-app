@@ -1,5 +1,44 @@
 import type { Request, Response } from "express";
 import { whatsappConfig } from "../config/whatsapp.config.js";
+import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
+
+
+export async function sendTestWhatsAppMessage(
+  request: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    const { to } = request.body;
+
+    if (!to) {
+      response.status(400).json({
+        success: false,
+        error: "Phone number is required",
+      });
+      return;
+    }
+
+    const result = await sendWhatsAppMessage(
+      to,
+      "Hello 👋 This is a test message from Via Nova Scholar Transport.",
+    );
+
+    response.status(200).json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    console.error("WhatsApp test failed:", error);
+
+    response.status(500).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error",
+    });
+  }
+}
 
 export function verifyWhatsAppWebhook(
   request: Request,
