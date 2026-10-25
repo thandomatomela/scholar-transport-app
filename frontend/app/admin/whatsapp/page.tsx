@@ -37,32 +37,21 @@ type Conversation = {
 type Message = {
   id: string;
   provider_message_id: string | null;
-
-  direction:
-    | "inbound"
-    | "outbound";
-
+  direction: "inbound" | "outbound";
   message_type: string;
-
   body: string | null;
-
   status: string | null;
+  whatsapp_timestamp: string | null;
 
-  whatsapp_timestamp:
-    | string
-    | null;
+  status_error_code: number | null;
+  status_error_title: string | null;
+  status_error_message: string | null;
+  status_error_details: string | null;
+  status_updated_at: string | null;
 
-  sent_by_user_id:
-    | string
-    | null;
-
-  sent_by_name:
-    | string
-    | null;
-
-  sent_by_role:
-    | string
-    | null;
+  sent_by_user_id: string | null;
+  sent_by_name: string | null;
+  sent_by_role: string | null;
 
   created_at: string;
 };
@@ -98,6 +87,51 @@ function formatDate(
   ).format(
     new Date(value),
   );
+}
+
+function getStatusLabel(
+  status: string | null,
+) {
+  switch (status) {
+    case "sent":
+      return "Sent";
+
+    case "delivered":
+      return "Delivered";
+
+    case "read":
+      return "Read";
+
+    case "failed":
+      return "Failed";
+
+    case "received":
+      return "Received";
+
+    default:
+      return status ?? "";
+  }
+}
+
+function getStatusClass(
+  status: string | null,
+) {
+  switch (status) {
+    case "read":
+      return "text-emerald-800";
+
+    case "delivered":
+      return "text-emerald-700";
+
+    case "failed":
+      return "text-red-700";
+
+    case "sent":
+      return "text-slate-600";
+
+    default:
+      return "text-slate-500";
+  }
 }
 
 export default function WhatsAppInboxPage() {
@@ -744,6 +778,11 @@ export default function WhatsAppInboxPage() {
                         message.direction ===
                         "outbound";
 
+                      const statusLabel =
+                        getStatusLabel(
+                          message.status,
+                        );
+
                       return (
                         <div
                           key={
@@ -783,20 +822,59 @@ export default function WhatsAppInboxPage() {
                                 </p>
                               )}
 
-                            <p className="mt-1 text-[10px] opacity-60">
-                              {formatDate(
-                                message.whatsapp_timestamp ||
-                                  message.created_at,
-                              )}
-                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
+                              <span className="opacity-60">
+                                {formatDate(
+                                  message.whatsapp_timestamp ||
+                                    message.created_at,
+                                )}
+                              </span>
+
+                              {outbound &&
+                                statusLabel && (
+                                  <span
+                                    className={[
+                                      "font-semibold",
+                                      getStatusClass(
+                                        message.status,
+                                      ),
+                                    ].join(
+                                      " ",
+                                    )}
+                                  >
+                                    {
+                                      statusLabel
+                                    }
+                                  </span>
+                                )}
+                            </div>
 
                             {outbound &&
-                              message.status && (
-                                <p className="mt-1 text-[10px] opacity-60">
-                                  {
-                                    message.status
-                                  }
-                                </p>
+                              message.status ===
+                                "failed" && (
+                                <div className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+                                  <p className="font-semibold">
+                                    {message.status_error_title ||
+                                      "Message failed"}
+                                  </p>
+
+                                  {message.status_error_details && (
+                                    <p className="mt-1">
+                                      {
+                                        message.status_error_details
+                                      }
+                                    </p>
+                                  )}
+
+                                  {message.status_error_code && (
+                                    <p className="mt-1 text-[10px] opacity-70">
+                                      Error code{" "}
+                                      {
+                                        message.status_error_code
+                                      }
+                                    </p>
+                                  )}
+                                </div>
                               )}
                           </div>
                         </div>
@@ -845,13 +923,6 @@ export default function WhatsAppInboxPage() {
                       : "Send"}
                   </button>
                 </div>
-
-                <p className="mt-2 text-xs text-slate-400">
-                  Messages are sent
-                  through the Via Nova
-                  WhatsApp Business
-                  number.
-                </p>
               </form>
             </>
           )}
