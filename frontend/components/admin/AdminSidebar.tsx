@@ -41,6 +41,11 @@ const navigationItems = [
     href: "/admin/trips",
     icon: "📍",
   },
+  {
+    label: "WhatsApp",
+    href: "/admin/whatsapp",
+    icon: "💬",
+  },
 ];
 
 export function AdminSidebar() {

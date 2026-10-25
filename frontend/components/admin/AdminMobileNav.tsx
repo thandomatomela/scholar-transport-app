@@ -34,6 +34,10 @@ const navigationItems = [
     label: "Trips",
     href: "/admin/trips",
   },
+  {
+    label: "WhatsApp",
+    href: "/admin/whatsapp",
+  },
 ];
 
 export function AdminMobileNav() {
